@@ -1,3 +1,4 @@
+// next.config.ts
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -8,10 +9,18 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
+        // Para a página de JOGADORES
         protocol: "https",
         hostname: "vwmnqzheqnejxkpxbvva.supabase.co",
         port: "",
         pathname: "/storage/v1/object/public/fotos-jogadores/**",
+      },
+      {
+        // Para a página da GALERIA
+        protocol: "https",
+        hostname: "vwmnqzheqnejxkpxbvva.supabase.co",
+        port: "",
+        pathname: "/storage/v1/object/public/galeria/**",
       },
     ],
   },
