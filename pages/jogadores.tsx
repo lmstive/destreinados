@@ -1,16 +1,16 @@
 // pages/jogadores.tsx
 import Layout from '../components/Layout';
 import Head from 'next/head';
-// AQUI: A linha 'import Image from 'next/image';' FOI REMOVIDA
-import { supabase } from '../lib/supabase'; // Importe o cliente Supabase
+import Image from 'next/image'; // CORREÇÃO: Import do componente Image
+import { supabase } from '../lib/supabase';
 
-// Definindo a interface para o tipo de jogador (boa prática com TypeScript)
+// Definindo a interface para o tipo de jogador
 interface Jogador {
   id: string;
   nome: string;
-  apelido: string | null; // Pode ser nulo
+  apelido: string | null;
   aniversario: string;
-  foto_url: string | null; // Pode ser nulo
+  foto_url: string | null;
   created_at: string;
 }
 
@@ -30,7 +30,6 @@ const JogadoresPage: React.FC<JogadoresPageProps> = ({ jogadores }) => {
     return diaA - diaB;
   };
 
-  // Ordena os jogadores recebidos do Supabase
   const jogadoresOrdenados = [...jogadores].sort(compararAniversarios);
 
   return (
@@ -45,21 +44,18 @@ const JogadoresPage: React.FC<JogadoresPageProps> = ({ jogadores }) => {
         ) : (
           jogadoresOrdenados.map((jogador) => (
             <div key={jogador.id} className="bg-white p-6 rounded-lg shadow-md text-center">
-              {/* Foto do Jogador - AGORA COM TAG <img> PADRÃO */}
               <div className="relative w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden border-2 border-blue-500">
-                <img // AQUI: <Image> foi substituído por <img>
-                  src={jogador.foto_url || '/jogadores/jogador-padrao.jpg'} // Usa a foto do jogador ou uma padrão
+                {/* CORREÇÃO: Substituição de <img> por <Image> */}
+                <Image
+                  src={jogador.foto_url || '/jogadores/jogador-padrao.jpg'}
                   alt={`Foto de ${jogador.nome}`}
-                  className="w-full h-full object-cover" // Classes Tailwind para cobrir o espaço
-                  onError={(e) => {
-                    // Fallback em caso de erro no carregamento da imagem real
-                    (e.target as HTMLImageElement).src = '/jogadores/jogador-padrao.jpg';
-                  }}
+                  width={96}
+                  height={96}
+                  objectFit="cover" // Garante que a imagem cubra o espaço, mesmo se não for quadrada
                 />
               </div>
 
               <h2 className="text-xl font-semibold text-gray-700">{jogador.nome}</h2>
-              {/* Apelido do Jogador */}
               {jogador.apelido && (
                 <p className="text-gray-600 text-lg mb-1">
                   Apelido: <span className="font-bold text-blue-600">{jogador.apelido}</span>
@@ -78,26 +74,25 @@ const JogadoresPage: React.FC<JogadoresPageProps> = ({ jogadores }) => {
 
 export default JogadoresPage;
 
-// Função para buscar dados do Supabase no momento da construção da página (SSG)
 export async function getStaticProps() {
   const { data, error } = await supabase
     .from('jogadores')
-    .select('id, nome, apelido, aniversario, foto_url, created_at'); // Seleciona todas as colunas que queremos
+    .select('id, nome, apelido, aniversario, foto_url, created_at');
 
   if (error) {
     console.error('Erro ao buscar jogadores do Supabase:', error);
     return {
       props: {
-        jogadores: [], // Retorna um array vazio em caso de erro
+        jogadores: [],
       },
-      revalidate: 1, // Tenta revalidar rapidamente em caso de erro
+      revalidate: 1,
     };
   }
 
   return {
     props: {
-      jogadores: data || [], // Passa os dados para o componente como prop
+      jogadores: data || [],
     },
-    revalidate: 60, // Revalida a página a cada 60 segundos (ISR - Incremental Static Regeneration)
+    revalidate: 60,
   };
 }
