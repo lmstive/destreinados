@@ -4,8 +4,8 @@ import { useState, useEffect, FormEvent } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
-import { supabase } from '../../lib/supabase'; // Importa nosso cliente supabase
-import Image from 'next/image'; // Importa o componente de Imagem do Next.js
+import { supabase } from '../../lib/supabase';
+import Image from 'next/image';
 
 // Define o tipo de um jogador para segurança de dados com TypeScript
 type Jogador = {
@@ -24,7 +24,7 @@ const GerenciarJogadores = () => {
   const [nome, setNome] = useState('');
   const [posicao, setPosicao] = useState('');
   const [numero, setNumero] = useState('');
-  const [imagemUrl, setImagemUrl] = useState(''); // Estado para a URL da imagem
+  const [imagemUrl, setImagemUrl] = useState('');
   const [loading, setLoading] = useState(true);
 
   // Segurança: Protege a página
@@ -68,7 +68,7 @@ const GerenciarJogadores = () => {
         nome, 
         posicao, 
         numero: numero ? parseInt(numero, 10) : null,
-        imagem_url: imagemUrl || null // Adiciona a URL da imagem (ou null se vazia)
+        imagem_url: imagemUrl || null
       });
 
     if (error) {
@@ -77,8 +77,8 @@ const GerenciarJogadores = () => {
       setNome('');
       setPosicao('');
       setNumero('');
-      setImagemUrl(''); // Limpa o campo da imagem
-      await fetchJogadores(); // Atualiza a lista
+      setImagemUrl('');
+      await fetchJogadores();
     }
   };
   
@@ -93,7 +93,7 @@ const GerenciarJogadores = () => {
       if (error) {
         console.error('Erro ao deletar jogador:', error);
       } else {
-        await fetchJogadores(); // Atualiza a lista
+        await fetchJogadores();
       }
     }
   };
@@ -104,12 +104,12 @@ const GerenciarJogadores = () => {
 
   return (
     <Layout title="Gerenciar Jogadores">
-      <h1 className="text-3xl font-bold mb-6">Gerenciar Jogadores</h1>
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Gerenciar Jogadores</h1>
 
       {/* Formulário para adicionar jogador */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <form onSubmit={handleAddJogador}>
-          <h2 className="text-2xl font-semibold mb-4">Adicionar Novo Jogador</h2>
+          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Adicionar Novo Jogador</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <input type="text" placeholder="Nome do jogador" value={nome} onChange={(e) => setNome(e.target.value)} className="p-2 border rounded" required />
             <input type="text" placeholder="Posição" value={posicao} onChange={(e) => setPosicao(e.target.value)} className="p-2 border rounded" required />
@@ -126,7 +126,7 @@ const GerenciarJogadores = () => {
 
       {/* Lista de jogadores */}
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold mb-4">Elenco Atual</h2>
+        <h2 className="text-2xl font-semibold mb-4 text-gray-800">Elenco Atual</h2>
         {loading ? (
           <p>Carregando elenco...</p>
         ) : (
@@ -142,7 +142,8 @@ const GerenciarJogadores = () => {
                     className="rounded-full object-cover"
                   />
                   <div>
-                    <span className="font-bold">{jogador.nome}</span>
+                    {/* Alteração aplicada aqui para garantir a cor do texto */}
+                    <span className="font-bold text-gray-800">{jogador.nome}</span>
                     <span className="text-gray-600"> - {jogador.posicao}</span>
                     {jogador.numero && <span className="text-gray-500 italic"> (#{jogador.numero})</span>}
                   </div>
