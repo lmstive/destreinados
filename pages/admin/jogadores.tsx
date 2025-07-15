@@ -187,9 +187,9 @@ const GerenciarJogadores = () => {
         <form onSubmit={handleAddJogador}>
           <h2 className="text-2xl font-semibold mb-4 text-gray-800">Adicionar Novo Jogador</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <input type="text" placeholder="Nome do jogador" value={nome} onChange={e => setNome(e.target.value)} className="p-2 border rounded" required />
-            <input type="text" placeholder="Apelido (opcional)" value={apelido} onChange={e => setApelido(e.target.value)} className="p-2 border rounded" />
-            <input type="text" placeholder="Aniversário (DD/MM)" value={aniversario} onChange={e => setAniversario(e.target.value)} className="p-2 border rounded" />
+            <input type="text" placeholder="Nome do jogador" value={nome} onChange={e => setNome(e.target.value)} className="p-2 border rounded text-gray-800 placeholder-gray-500" required />
+            <input type="text" placeholder="Apelido (opcional)" value={apelido} onChange={e => setApelido(e.target.value)} className="p-2 border rounded text-gray-800 placeholder-gray-500" />
+            <input type="text" placeholder="Aniversário (DD/MM)" value={aniversario} onChange={e => setAniversario(e.target.value)} className="p-2 border rounded text-gray-800 placeholder-gray-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Foto (opcional)</label>
@@ -213,9 +213,9 @@ const GerenciarJogadores = () => {
                             <Image src={editValues.foto_url || '/jogadores/jogador-padrao.jpg'} alt="Foto atual" width={60} height={60} className="rounded-full object-cover"/>
                             <div className="w-full space-y-2">
                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                  <input type="text" name="nome" value={editValues.nome} onChange={handleEditChange} className="p-2 border rounded"/>
-                                  <input type="text" name="apelido" value={editValues.apelido} onChange={handleEditChange} className="p-2 border rounded"/>
-                                  <input type="text" name="aniversario" value={editValues.aniversario} onChange={handleEditChange} className="p-2 border rounded"/>
+                                  <input type="text" name="nome" value={editValues.nome} onChange={handleEditChange} className="p-2 border rounded text-gray-800 placeholder-gray-500"/>
+                                  <input type="text" name="apelido" value={editValues.apelido} onChange={handleEditChange} className="p-2 border rounded text-gray-800 placeholder-gray-500"/>
+                                  <input type="text" name="aniversario" value={editValues.aniversario} onChange={handleEditChange} className="p-2 border rounded text-gray-800 placeholder-gray-500"/>
                                </div>
                                <div>
                                   <label className="block text-xs text-gray-600">Substituir foto:</label>
