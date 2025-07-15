@@ -1,8 +1,9 @@
 // pages/galeria.tsx
-import React, { useState, useEffect } from 'react'; // Importar useEffect para navegação por teclado
+import React, { useState, useEffect, useCallback } from 'react'; // Adicionado useCallback
 import Layout from '../components/Layout';
 import Head from 'next/head';
-import { supabase } from '../lib/supabase'; // Importe o cliente Supabase
+import Image from 'next/image'; // Importado o componente de Imagem do Next.js
+import { supabase } from '../lib/supabase';
 
 // Interface para o tipo de foto da galeria
 interface FotoGaleria {
@@ -17,41 +18,35 @@ interface GaleriaPageProps {
 }
 
 const GaleriaPage: React.FC<GaleriaPageProps> = ({ fotos }) => {
-  // Estado para controlar o modal do lightbox
   const [showLightbox, setShowLightbox] = useState(false);
-  // Alterado para armazenar o ÍNDICE da imagem atual, não o objeto inteiro
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0); 
 
   // Função para abrir o lightbox
-  const openLightbox = (index: number) => { // Agora recebe o índice
+  const openLightbox = (index: number) => {
     setCurrentImageIndex(index);
     setShowLightbox(true);
   };
 
-  // Função para fechar o lightbox
-  const closeLightbox = () => {
-    setCurrentImageIndex(0); // Reseta o índice
+  // CORREÇÃO 1: Funções envolvidas com useCallback para otimização
+  const closeLightbox = useCallback(() => {
+    setCurrentImageIndex(0);
     setShowLightbox(false);
-  };
+  }, []);
 
-  // Função para mostrar a próxima imagem
-  const showNextImage = () => {
-    setCurrentImageIndex((prevIndex) => 
-      (prevIndex + 1) % fotos.length // Volta para o início se chegar ao fim
-    );
-  };
+  const showNextImage = useCallback(() => {
+    if (fotos.length <= 1) return;
+    setCurrentImageIndex((prevIndex) => (prevIndex + 1) % fotos.length);
+  }, [fotos.length]);
 
-  // Função para mostrar a imagem anterior
-  const showPrevImage = () => {
-    setCurrentImageIndex((prevIndex) => 
-      (prevIndex - 1 + fotos.length) % fotos.length // Volta para o fim se chegar ao início
-    );
-  };
+  const showPrevImage = useCallback(() => {
+    if (fotos.length <= 1) return;
+    setCurrentImageIndex((prevIndex) => (prevIndex - 1 + fotos.length) % fotos.length);
+  }, [fotos.length]);
 
-  // Efeito para navegação por teclado (setas)
+  // CORREÇÃO 1: Adicionadas as dependências que faltavam no useEffect
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!showLightbox || fotos.length <= 1) return; // Só funciona se o lightbox estiver aberto e houver mais de uma foto
+      if (!showLightbox) return;
 
       if (event.key === 'ArrowRight') {
         showNextImage();
@@ -66,11 +61,9 @@ const GaleriaPage: React.FC<GaleriaPageProps> = ({ fotos }) => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showLightbox, fotos.length]); // Dependências: re-executa se o lightbox abrir/fechar ou se o número de fotos mudar
+  }, [showLightbox, showNextImage, showPrevImage, closeLightbox]);
 
-  // Objeto da imagem atual a ser exibida no lightbox
   const currentImage = fotos[currentImageIndex];
-
 
   return (
     <Layout>
@@ -83,19 +76,21 @@ const GaleriaPage: React.FC<GaleriaPageProps> = ({ fotos }) => {
         <p className="text-gray-600 col-span-full text-center">Nenhuma foto na galeria ainda. Adicione-as pelo painel Admin!</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {fotos.map((foto, index) => ( // Adicionado 'index' aqui
+          {fotos.map((foto, index) => (
             <div 
               key={foto.id} 
               className="relative w-full h-64 bg-gray-200 rounded-lg overflow-hidden shadow-md group cursor-pointer"
-              onClick={() => openLightbox(index)} // Passa o índice para abrir o lightbox
+              onClick={() => openLightbox(index)}
             >
-              <img
+              {/* CORREÇÃO 2: Substituído <img> por <Image> */}
+              <Image
                 src={foto.foto_url}
                 alt={foto.legenda || 'Foto da Galeria'}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/galeria/placeholder.jpg'; 
-                }}
+                layout="fill" // Faz a imagem preencher o container pai
+                objectFit="cover" // Equivalente ao `object-cover` do Tailwind
+                className="transition-transform duration-300 group-hover:scale-105"
+                placeholder="blur" // Opcional: Efeito de blur enquanto carrega
+                blurDataURL="/placeholder.png" // Opcional: Imagem de placeholder
               />
               {foto.legenda && (
                 <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs p-2 truncate">
@@ -114,42 +109,47 @@ const GaleriaPage: React.FC<GaleriaPageProps> = ({ fotos }) => {
           onClick={closeLightbox}
         >
           <div 
-            className="relative bg-white p-2 rounded-lg max-w-4xl max-h-full flex flex-col items-center justify-center"
+            className="relative bg-white p-2 rounded-lg w-full max-w-4xl h-full max-h-[90vh] flex flex-col items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             <button 
               onClick={closeLightbox} 
-              className="absolute top-2 right-2 text-white bg-gray-800 rounded-full p-1 leading-none text-xl z-10"
+              className="absolute top-2 right-2 text-white bg-gray-800 rounded-full p-1 leading-none text-xl z-20"
               style={{ width: '30px', height: '30px' }}
             >
               &times;
             </button>
-
+            
+            <div className="relative w-full h-full">
+                {/* CORREÇÃO 2: Substituído <img> por <Image> também no Lightbox */}
+                <Image 
+                  src={currentImage.foto_url} 
+                  alt={currentImage.legenda || 'Foto ampliada'} 
+                  layout="fill"
+                  objectFit="contain" // Garante que a imagem inteira apareça
+                />
+            </div>
+            
             {/* Botões de Navegação (apenas se houver mais de 1 foto) */}
             {fotos.length > 1 && (
               <>
                 <button 
-                  onClick={showPrevImage} 
-                  className="absolute left-2 top-1/2 -translate-y-1/2 text-white bg-gray-800 rounded-full p-2 z-10 opacity-75 hover:opacity-100"
+                  onClick={(e) => { e.stopPropagation(); showPrevImage(); }} 
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-white bg-gray-800 rounded-full p-2 z-20 opacity-75 hover:opacity-100"
                 >
                   &lt;
                 </button>
                 <button 
-                  onClick={showNextImage} 
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-white bg-gray-800 rounded-full p-2 z-10 opacity-75 hover:opacity-100"
+                  onClick={(e) => { e.stopPropagation(); showNextImage(); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-white bg-gray-800 rounded-full p-2 z-20 opacity-75 hover:opacity-100"
                 >
                   &gt;
                 </button>
               </>
             )}
-
-            <img 
-              src={currentImage.foto_url} 
-              alt={currentImage.legenda || 'Foto ampliada'} 
-              className="max-w-full max-h-[80vh] object-contain mx-auto my-auto"
-            />
+            
             {currentImage.legenda && (
-              <p className="text-center text-gray-800 text-sm mt-2">
+              <p className="text-center text-gray-800 text-sm mt-2 absolute bottom-[-30px] w-full">
                 {currentImage.legenda}
               </p>
             )}
@@ -162,7 +162,6 @@ const GaleriaPage: React.FC<GaleriaPageProps> = ({ fotos }) => {
 
 export default GaleriaPage;
 
-// Função para buscar dados do Supabase no momento da construção da página (SSG)
 export async function getStaticProps() {
   const { data, error } = await supabase
     .from('galeria_fotos')
@@ -172,17 +171,13 @@ export async function getStaticProps() {
   if (error) {
     console.error('Erro ao buscar fotos para a Galeria Pública:', error);
     return {
-      props: {
-        fotos: [],
-      },
+      props: { fotos: [] },
       revalidate: 1,
     };
   }
 
   return {
-    props: {
-      fotos: data || [],
-    },
+    props: { fotos: data || [] },
     revalidate: 60,
   };
 }
