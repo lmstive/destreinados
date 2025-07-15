@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import { supabase } from '../../lib/supabase'; // Importa nosso cliente supabase
+import Image from 'next/image'; // Importa o componente de Imagem do Next.js
 
 // Define o tipo de um jogador para segurança de dados com TypeScript
 type Jogador = {
@@ -23,6 +24,7 @@ const GerenciarJogadores = () => {
   const [nome, setNome] = useState('');
   const [posicao, setPosicao] = useState('');
   const [numero, setNumero] = useState('');
+  const [imagemUrl, setImagemUrl] = useState(''); // Estado para a URL da imagem
   const [loading, setLoading] = useState(true);
 
   // Segurança: Protege a página
@@ -35,7 +37,7 @@ const GerenciarJogadores = () => {
   const fetchJogadores = async () => {
     setLoading(true);
     const { data: jogadoresData, error } = await supabase
-      .from('jogadores') // IMPORTANTE: sua tabela no supabase deve se chamar 'jogadores'
+      .from('jogadores')
       .select('*')
       .order('nome', { ascending: true });
 
@@ -62,7 +64,12 @@ const GerenciarJogadores = () => {
 
     const { error } = await supabase
       .from('jogadores')
-      .insert({ nome, posicao, numero: numero ? parseInt(numero, 10) : null });
+      .insert({ 
+        nome, 
+        posicao, 
+        numero: numero ? parseInt(numero, 10) : null,
+        imagem_url: imagemUrl || null // Adiciona a URL da imagem (ou null se vazia)
+      });
 
     if (error) {
       console.error('Erro ao adicionar jogador:', error);
@@ -70,6 +77,7 @@ const GerenciarJogadores = () => {
       setNome('');
       setPosicao('');
       setNumero('');
+      setImagemUrl(''); // Limpa o campo da imagem
       await fetchJogadores(); // Atualiza a lista
     }
   };
@@ -107,6 +115,9 @@ const GerenciarJogadores = () => {
             <input type="text" placeholder="Posição" value={posicao} onChange={(e) => setPosicao(e.target.value)} className="p-2 border rounded" required />
             <input type="number" placeholder="Número (opcional)" value={numero} onChange={(e) => setNumero(e.target.value)} className="p-2 border rounded" />
           </div>
+          <div className="mt-4">
+            <input type="url" placeholder="URL da imagem (opcional)" value={imagemUrl} onChange={(e) => setImagemUrl(e.target.value)} className="p-2 border rounded w-full" />
+          </div>
           <button type="submit" className="mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
             Adicionar Jogador
           </button>
@@ -122,10 +133,19 @@ const GerenciarJogadores = () => {
           <div className="space-y-2">
             {jogadores.map((jogador) => (
               <div key={jogador.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                <div>
-                  <span className="font-bold">{jogador.nome}</span>
-                  <span className="text-gray-600"> - {jogador.posicao}</span>
-                  {jogador.numero && <span className="text-gray-500 italic"> (#{jogador.numero})</span>}
+                <div className="flex items-center space-x-4">
+                  <Image
+                    src={jogador.imagem_url || '/jogadores/jogador-padrao.jpg'}
+                    alt={`Foto de ${jogador.nome}`}
+                    width={40}
+                    height={40}
+                    className="rounded-full object-cover"
+                  />
+                  <div>
+                    <span className="font-bold">{jogador.nome}</span>
+                    <span className="text-gray-600"> - {jogador.posicao}</span>
+                    {jogador.numero && <span className="text-gray-500 italic"> (#{jogador.numero})</span>}
+                  </div>
                 </div>
                 <button onClick={() => handleDeleteJogador(jogador.id)} className="text-red-500 hover:text-red-700">
                   Excluir
