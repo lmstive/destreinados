@@ -7,21 +7,19 @@ import Layout from '../../components/Layout';
 import { supabase } from '../../lib/supabase';
 import Image from 'next/image';
 
-// Define o tipo de um jogador para segurança de dados com TypeScript
 type Jogador = {
   id: number;
   nome: string;
-  posicao: string;
-  numero: number | null;
-  imagem_url: string | null;
+  apelido: string | null;
+  aniversario: string | null;
+  foto_url: string | null;
 };
 
-// Define o tipo para os valores do formulário de edição
 type EditFormValues = {
   nome: string;
-  posicao: string;
-  numero: string;
-  imagem_url: string;
+  apelido: string;
+  aniversario: string;
+  foto_url: string;
 };
 
 const GerenciarJogadores = () => {
@@ -29,37 +27,28 @@ const GerenciarJogadores = () => {
   const router = useRouter();
   
   const [jogadores, setJogadores] = useState<Jogador[]>([]);
-  // --- State para o formulário de ADICIONAR ---
-  const [nome, setNome] = useState('');
-  const [posicao, setPosicao] = useState('');
-  const [numero, setNumero] = useState('');
-  const [imagemUrl, setImagemUrl] = useState('');
-  
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
-  // --- State para controlar a EDIÇÃO ---
+  const [nome, setNome] = useState('');
+  const [apelido, setApelido] = useState('');
+  const [aniversario, setAniversario] = useState('');
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+
   const [editingJogador, setEditingJogador] = useState<Jogador | null>(null);
-  const [editValues, setEditValues] = useState<EditFormValues>({ nome: '', posicao: '', numero: '', imagem_url: '' });
+  const [editValues, setEditValues] = useState<EditFormValues>({ nome: '', apelido: '', aniversario: '', foto_url: '' });
+  const [newFotoFile, setNewFotoFile] = useState<File | null>(null);
 
-  // Segurança: Protege a página
   useEffect(() => {
     if (status === 'loading') return;
     if (!session) router.push('/');
   }, [session, status, router]);
 
-  // Função para buscar os jogadores no banco de dados
   const fetchJogadores = async () => {
     setLoading(true);
-    const { data: jogadoresData, error } = await supabase
-      .from('jogadores')
-      .select('*')
-      .order('nome', { ascending: true });
-
-    if (error) {
-      console.error('Erro ao buscar jogadores:', error);
-    } else if (jogadoresData) {
-      setJogadores(jogadoresData);
-    }
+    const { data, error } = await supabase.from('jogadores').select('*').order('nome', { ascending: true });
+    if (error) console.error('Erro ao buscar jogadores:', error);
+    else if (data) setJogadores(data);
     setLoading(false);
   };
 
@@ -67,65 +56,124 @@ const GerenciarJogadores = () => {
     fetchJogadores();
   }, []);
 
-  // Função para ADICIONAR um novo jogador
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, fileSetter: React.Dispatch<React.SetStateAction<File | null>>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      fileSetter(e.target.files[0]);
+    } else {
+      fileSetter(null);
+    }
+  };
+
+  const uploadFoto = async (file: File): Promise<string | null> => {
+    try {
+      setUploading(true);
+      const filePath = `public/${Date.now()}-${file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('fotos-jogadores')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('fotos-jogadores').getPublicUrl(filePath);
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      alert('Falha ao enviar a imagem.');
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleAddJogador = async (e: FormEvent) => {
     e.preventDefault();
-    // ... (código existente sem alterações) ...
+    if (!nome) return alert('O nome é obrigatório.');
+    
+    let publicUrl = null;
+    if (fotoFile) {
+      publicUrl = await uploadFoto(fotoFile);
+      if (!publicUrl) return;
+    }
+    
+    const { error } = await supabase.from('jogadores').insert({ 
+      nome, apelido: apelido || null, aniversario: aniversario || null, foto_url: publicUrl,
+    });
+
+    if (error) {
+      console.error('Erro ao adicionar jogador:', error);
+      alert('Falha ao adicionar jogador.');
+    } else {
+      setNome(''); setApelido(''); setAniversario(''); setFotoFile(null);
+      await fetchJogadores();
+    }
   };
-  
-  // Função para DELETAR um jogador
+
   const handleDeleteJogador = async (id: number) => {
-    // ... (código existente sem alterações) ...
+    if (window.confirm('Tem certeza que deseja excluir este jogador?')) {
+      const { error } = await supabase.from('jogadores').delete().match({ id });
+      if (error) console.error('Erro ao deletar jogador:', error);
+      else await fetchJogadores();
+    }
   };
 
-  // --- Novas Funções para EDITAR ---
-
-  // Prepara o formulário de edição quando o botão "Editar" é clicado
   const handleStartEdit = (jogador: Jogador) => {
     setEditingJogador(jogador);
     setEditValues({
       nome: jogador.nome,
-      posicao: jogador.posicao,
-      numero: jogador.numero?.toString() || '',
-      imagem_url: jogador.imagem_url || '',
+      apelido: jogador.apelido || '',
+      aniversario: jogador.aniversario || '',
+      foto_url: jogador.foto_url || '',
     });
+    setNewFotoFile(null);
   };
 
-  // Cancela a edição e volta à visualização normal
-  const handleCancelEdit = () => {
-    setEditingJogador(null);
-  };
+  const handleCancelEdit = () => setEditingJogador(null);
 
-  // Envia as atualizações para o Supabase
   const handleUpdateJogador = async (e: FormEvent) => {
     e.preventDefault();
     if (!editingJogador) return;
+
+    let publicUrl = editValues.foto_url; // Mantém a URL existente por padrão
+    if (newFotoFile) {
+      const uploadedUrl = await uploadFoto(newFotoFile);
+      if (uploadedUrl) {
+        publicUrl = uploadedUrl;
+      } else {
+        return; // Falha no upload, interrompe a atualização
+      }
+    }
 
     const { error } = await supabase
       .from('jogadores')
       .update({
         nome: editValues.nome,
-        posicao: editValues.posicao,
-        numero: editValues.numero ? parseInt(editValues.numero, 10) : null,
-        imagem_url: editValues.imagem_url || null,
+        apelido: editValues.apelido || null,
+        aniversario: editValues.aniversario || null,
+        foto_url: publicUrl || null,
       })
       .match({ id: editingJogador.id });
 
     if (error) {
-      console.error('Erro ao atualizar jogador:', error);
       alert('Falha ao atualizar jogador.');
+      console.error('Erro ao atualizar:', error);
     } else {
-      setEditingJogador(null); // Fecha o modo de edição
-      await fetchJogadores(); // Atualiza a lista
+      setEditingJogador(null);
+      await fetchJogadores();
     }
   };
 
-  // Atualiza os valores do formulário de edição em tempo real
+  // ==========================================================
+  // AQUI ESTÁ A CORREÇÃO
+  // ==========================================================
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setEditValues(prev => ({ ...prev, [name]: value }));
+    setEditValues(prev => ({
+      ...prev,
+      [name]: value,
+    }));
   };
-
+  // ==========================================================
 
   if (status === 'loading' || !session) {
     return <Layout><p>Verificando permissão...</p></Layout>;
@@ -135,64 +183,76 @@ const GerenciarJogadores = () => {
     <Layout title="Gerenciar Jogadores">
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Gerenciar Jogadores</h1>
 
-      {/* Formulário para adicionar jogador (sem alterações) */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-        {/* ... (código do formulário de adicionar) ... */}
+        <form onSubmit={handleAddJogador}>
+          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Adicionar Novo Jogador</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <input type="text" placeholder="Nome do jogador" value={nome} onChange={e => setNome(e.target.value)} className="p-2 border rounded" required />
+            <input type="text" placeholder="Apelido (opcional)" value={apelido} onChange={e => setApelido(e.target.value)} className="p-2 border rounded" />
+            <input type="text" placeholder="Aniversário (DD/MM)" value={aniversario} onChange={e => setAniversario(e.target.value)} className="p-2 border rounded" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Foto (opcional)</label>
+            <input type="file" onChange={e => handleFileSelect(e, setFotoFile)} accept="image/*" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+          </div>
+          <button type="submit" disabled={uploading} className="mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:bg-gray-400">
+            {uploading ? 'Enviando foto...' : 'Adicionar Jogador'}
+          </button>
+        </form>
       </div>
 
-      {/* Lista de jogadores com lógica de edição */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold mb-4 text-gray-800">Elenco Atual</h2>
-        {loading ? (
-          <p>Carregando elenco...</p>
-        ) : (
-          <div className="space-y-2">
-            {jogadores.map((jogador) => (
-              <div key={jogador.id}>
-                {editingJogador?.id === jogador.id ? (
-                  // --- MODO DE EDIÇÃO ---
-                  <form onSubmit={handleUpdateJogador} className="p-3 bg-blue-50 rounded border border-blue-300">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
-                      <input type="text" name="nome" value={editValues.nome} onChange={handleEditChange} className="p-2 border rounded" />
-                      <input type="text" name="posicao" value={editValues.posicao} onChange={handleEditChange} className="p-2 border rounded" />
-                      <input type="number" name="numero" value={editValues.numero} onChange={handleEditChange} className="p-2 border rounded" />
-                      <input type="url" name="imagem_url" value={editValues.imagem_url} onChange={handleEditChange} className="p-2 border rounded" placeholder="URL da imagem" />
-                    </div>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <button type="submit" className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">Salvar</button>
-                      <button type="button" onClick={handleCancelEdit} className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">Cancelar</button>
-                    </div>
-                  </form>
-                ) : (
-                  // --- MODO DE VISUALIZAÇÃO NORMAL ---
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <div className="flex items-center space-x-4">
-                      <Image
-                        src={jogador.imagem_url || '/jogadores/jogador-padrao.jpg'}
-                        alt={`Foto de ${jogador.nome}`}
-                        width={40}
-                        height={40}
-                        className="rounded-full object-cover"
-                      />
-                      {/* DIV com a CORREÇÃO da cor do texto */}
-                      <div className="text-gray-800"> 
-                        <span className="font-bold">{jogador.nome}</span>
-                        <span className="text-gray-600"> - {jogador.posicao}</span>
-                        {jogador.numero && <span className="text-gray-500 italic"> (#{jogador.numero})</span>}
+        {loading ? <p>Carregando...</p> : (
+          <div className="space-y-4">
+             {jogadores.map(jogador => (
+                <div key={jogador.id}>
+                   {editingJogador?.id === jogador.id ? (
+                      <form onSubmit={handleUpdateJogador} className="p-4 bg-blue-50 rounded border-2 border-blue-300">
+                         <div className="flex items-center space-x-4">
+                            <Image src={editValues.foto_url || '/jogadores/jogador-padrao.jpg'} alt="Foto atual" width={60} height={60} className="rounded-full object-cover"/>
+                            <div className="w-full space-y-2">
+                               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                  <input type="text" name="nome" value={editValues.nome} onChange={handleEditChange} className="p-2 border rounded"/>
+                                  <input type="text" name="apelido" value={editValues.apelido} onChange={handleEditChange} className="p-2 border rounded"/>
+                                  <input type="text" name="aniversario" value={editValues.aniversario} onChange={handleEditChange} className="p-2 border rounded"/>
+                               </div>
+                               <div>
+                                  <label className="block text-xs text-gray-600">Substituir foto:</label>
+                                  <input type="file" onChange={e => handleFileSelect(e, setNewFotoFile)} accept="image/*" className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"/>
+                               </div>
+                            </div>
+                         </div>
+                         <div className="flex items-center space-x-2 mt-4">
+                            <button type="submit" disabled={uploading} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 disabled:bg-gray-400">
+                              {uploading ? 'Enviando...' : 'Salvar'}
+                            </button>
+                            <button type="button" onClick={handleCancelEdit} className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">Cancelar</button>
+                         </div>
+                      </form>
+                   ) : (
+                      <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                        <div className="flex items-center space-x-4">
+                          <Image
+                            src={jogador.foto_url || '/jogadores/jogador-padrao.jpg'}
+                            alt={`Foto de ${jogador.nome}`}
+                            width={50} height={50}
+                            className="rounded-full object-cover"
+                          />
+                          <div className="text-gray-800"> 
+                            <div className="font-bold text-lg">{jogador.nome}</div>
+                            {jogador.apelido && <div className="text-sm text-gray-600">Apelido: {jogador.apelido}</div>}
+                            {jogador.aniversario && <div className="text-sm text-gray-600">Aniversário: {jogador.aniversario}</div>}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <button onClick={() => handleStartEdit(jogador)} className="text-blue-500 hover:text-blue-700 font-semibold text-sm">Editar</button>
+                          <button onClick={() => handleDeleteJogador(jogador.id)} className="text-red-500 hover:text-red-700 font-semibold text-sm">Excluir</button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <button onClick={() => handleStartEdit(jogador)} className="text-blue-500 hover:text-blue-700 font-semibold text-sm">
-                        Editar
-                      </button>
-                      <button onClick={() => handleDeleteJogador(jogador.id)} className="text-red-500 hover:text-red-700 font-semibold text-sm">
-                        Excluir
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                   )}
+                </div>
+             ))}
           </div>
         )}
       </div>
