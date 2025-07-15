@@ -175,7 +175,7 @@ const PedidosPage: React.FC = () => {
           } else {
             valueToReplace = campo.placeholder;
           }
-        } catch (e) {
+        } catch {
           valueToReplace = campo.placeholder;
         }
       }
@@ -185,7 +185,7 @@ const PedidosPage: React.FC = () => {
     // 2. Substituir a seção "A TROCA JUSTA" completa
     const trocaJustaPlaceholder = currentTemplate.id === 'vale-churrasco' ? '[TROCA_JUSTA_OPCOES_CHURRASCO]' : '[TROCA_JUSTA_OPCOES]';
     const escapedTrocaPlaceholder = escapeRegExp(trocaJustaPlaceholder);
-    let trocaJustaOpcoesFormatadas = currentTemplate.opcoesTrocaJusta.map(opcao => {
+    const trocaJustaOpcoesFormatadas = currentTemplate.opcoesTrocaJusta.map(opcao => {
       const isChecked = formValues[opcao.id];
       return `(${isChecked ? 'X' : ' '}) ${opcao.texto}`;
     }).join('\n');
@@ -216,7 +216,7 @@ const PedidosPage: React.FC = () => {
       try {
         await navigator.clipboard.writeText(finalRequerimentoText);
         setCopySuccess('Copiado! ✅');
-      } catch (err) {
+      } catch (err) { // <<<===== CORREÇÃO APLICADA AQUI
         console.error('Falha ao copiar texto: ', err);
         setCopySuccess('Erro ao copiar! ❌');
       } finally {
