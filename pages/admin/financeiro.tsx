@@ -4,14 +4,15 @@ import Layout from '../../components/Layout';
 import Head from 'next/head';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabase';
-import { CheckCircleIcon, XCircleIcon, ClockIcon as PendenteIcon } from '@heroicons/react/24/outline'; // Ícones de status
+// CORRIGIDO: Removido XCircleIcon pois não é usado na interface
+import { CheckCircleIcon, ClockIcon as PendenteIcon } from '@heroicons/react/24/outline'; // Ícones de status
 
 // Interfaces para os tipos de dados
 interface Jogador {
   id: string;
   nome: string;
   apelido: string | null;
-  papel: string; // 'Mensalista', 'Convidado', 'Goleiro' - AGORA BUSCADO DA TABELA JOGADORES
+  papel: string; // 'Mensalista', 'Convidado', 'Goleiro'
 }
 
 interface Pagamento {
@@ -47,11 +48,13 @@ const AdminFinanceiroPage: React.FC = () => {
   // Valores fixos de pagamento
   const valorMensalidade = 50;
   const valorJogoAvulso = 15;
-  const custoCampoEstimado = 150; // Exemplo de custo fixo do campo por jogo/mês
+  // CORRIGIDO: Comentado custoCampoEstimado pois não é usado no cálculo final
+  // const custoCampoEstimado = 150; // Exemplo de custo fixo do campo por jogo/mês
 
 
   // --- Função principal para buscar dados ---
-  const fetchData = async () => {
+  // CORRIGIDO: Definida dentro do componente para ser incluída no array de dependências do useEffect
+  const fetchData = React.useCallback(async () => { // Usamos useCallback para otimizar o useEffect
     setLoading(true);
     setError(null);
 
@@ -84,12 +87,14 @@ const AdminFinanceiroPage: React.FC = () => {
     }
     setRegistrosPagamento(pagamentosData || []);
     setLoading(false);
-  };
+  }, [mesAnoSelecionado]); // Dependência: refaz fetchData se mesAnoSelecionado mudar
 
   // Carrega dados na montagem do componente e quando o mês/ano mudar
+  // CORRIGIDO: Adicionado fetchData ao array de dependências
   useEffect(() => {
     fetchData();
-  }, [mesAnoSelecionado]);
+  }, [fetchData]); // Agora fetchData está no array de dependências do useEffect
+
 
   // Lidar com a mudança do mês/ano
   const handleMesAnoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
