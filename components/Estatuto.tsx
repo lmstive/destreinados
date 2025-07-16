@@ -6,7 +6,7 @@ const Estatuto = () => {
   return (
     // Seção que envolve todo o estatuto
     <section className="bg-white p-6 md:p-8 rounded-lg shadow-md mt-8">
-      
+
       <h2 className="text-3xl font-extrabold text-center text-gray-800 mb-6 border-b pb-4">
         Estatuto Oficial <em className="text-gray-500">(ou quase)</em> do Destreinados FC
       </h2>
@@ -37,7 +37,7 @@ const Estatuto = () => {
             <li><strong className="font-semibold">Convidados</strong> – Só entram se a diretoria autorizar e o time estiver com menos de 12 (ou sem reservas).</li>
           </ul>
         </div>
-        
+
         <div>
           <h4 className="text-xl font-bold text-gray-800">Artigo 4 – Regras (<em>ou o que fingimos seguir</em>)</h4>
           <ul className="list-disc list-inside pl-4 mt-2 space-y-1">
@@ -52,7 +52,7 @@ const Estatuto = () => {
         <div>
           <h4 className="text-xl font-bold text-gray-800">Artigo 5 – Diretoria</h4>
           <p>O poder está descentralizado, mas o respeito é centralizado nos mitos:</p>
-           <ul className="list-disc list-inside pl-4 mt-2 space-y-1">
+          <ul className="list-disc list-inside pl-4 mt-2 space-y-1">
             <li><strong className="font-semibold">Xisto</strong> – Presidente tesoureiro implacável, fiscal do Pix, cobrador oficial do “dízimo”;</li>
             <li><strong className="font-semibold">Stive</strong> – Manda p**** nenhuma, mas ajuda em algumas coisas.</li>
           </ul>
@@ -74,8 +74,8 @@ const Estatuto = () => {
           <ul className="list-disc list-inside pl-4 mt-2 space-y-1">
             <li>O rateio é lei;</li>
             <li>O Pix é dever cívico;</li>
-            {/* ✅ CORREÇÃO AQUI: A frase com aspas foi colocada dentro de chaves {} */}
-            <li>Quem não pagar, leva <em className="italic">exposed</em> no grupo e figurinha personalizada com sua cara e a frase: {'"Esqueci o Pix, irmão..."'}</li>
+            {/* CORREÇÃO AQUI: As aspas duplas foram substituídas por &quot; */}
+            <li>Quem não pagar, leva <em className="italic">exposed</em> no grupo e figurinha personalizada com sua cara e a frase: &quot;Esqueci o Pix, irmão...&quot;</li>
           </ul>
         </div>
 
@@ -107,8 +107,8 @@ const Estatuto = () => {
             <p>Este estatuto foi aprovado por todos os membros que leram até aqui (ou não). Pode ser atualizado sempre que:</p>
             <ul className="list-none mt-2 space-y-1">
                 <li>A zoeira aumentar;</li>
-                 {/* ✅ CORREÇÃO AQUI: Também foi colocado dentro de chaves {} */}
-                <li>Ou o Xisto subir o preço do campo dizendo que {'"a inflação tá osso"'}</li>
+                {/* CORREÇÃO AQUI: As aspas duplas foram substituídas por &quot; */}
+                <li>Ou o Xisto subir o preço do campo dizendo que &quot;a inflação tá osso&quot;</li>
             </ul>
         </div>
 
