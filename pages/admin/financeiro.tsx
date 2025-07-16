@@ -435,21 +435,21 @@ const AdminFinanceiroPage: React.FC = () => {
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Adicionar Novo Participante Financeiro</h2>
         <form onSubmit={handleAddParticipante} className="space-y-4">
           <div>
-            <label htmlFor="novoParticipanteNome" className="block text-sm font-medium text-gray-700">Nome do Participante</label>
+            <label htmlFor="novoParticipanteNome" className="block text-sm font-medium text-black">Nome do Participante</label>
             <input
               type="text"
               id="novoParticipanteNome"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-black placeholder-gray-500"
               value={novoParticipanteNome}
               onChange={(e) => setNovoParticipanteNome(e.target.value)}
               required
             />
           </div>
           <div>
-            <label htmlFor="novoParticipantePapel" className="block text-sm font-medium text-gray-700">Papel</label>
+            <label htmlFor="novoParticipantePapel" className="block text-sm font-medium text-black">Papel</label>
             <select
               id="novoParticipantePapel"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-black"
               value={novoParticipantePapel}
               onChange={(e) => setNovoParticipantePapel(e.target.value as 'Mensalista' | 'Convidado' | 'Goleiro')}
             >
@@ -473,11 +473,11 @@ const AdminFinanceiroPage: React.FC = () => {
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Visão Geral dos Pagamentos</h2>
         <div className="mb-4">
-          <label htmlFor="mesAno" className="block text-sm font-medium text-gray-700">Ver Pagamentos de: (MM/AAAA)</label>
+          <label htmlFor="mesAno" className="block text-sm font-medium text-black">Ver Pagamentos de: (MM/AAAA)</label>
           <input
             type="text"
             id="mesAno"
-            className="mt-1 block w-40 border border-gray-300 rounded-md shadow-sm p-2"
+            className="mt-1 block w-40 border border-gray-300 rounded-md shadow-sm p-2 text-black placeholder-gray-500"
             value={mesAno}
             onChange={(e) => setMesAno(e.target.value)}
             placeholder="MM/AAAA"
@@ -493,9 +493,9 @@ const AdminFinanceiroPage: React.FC = () => {
           </div>
           <div className="bg-yellow-50 p-4 rounded-lg">
             <h3 className="text-lg font-semibold text-yellow-800">Status Geral ({mesAno}):</h3>
-            <p className="text-yellow-700">Mensalistas Pagos: {statusGeral.mensalistasPagos} de {statusGeral.mensalistasCadastrados} cadastrados</p>
-            <p className="text-yellow-700">Convidados Pagos: {statusGeral.convidadosPagos} de {statusGeral.convidadosCadastrados} cadastrados</p>
-            <p className="text-yellow-700">Goleiros Isentos: {statusGeral.goleirosIsentos} de {statusGeral.goleirosCadastrados} cadastrados</p>
+            <p className="text-black">Mensalistas Pagos: {statusGeral.mensalistasPagos} de {statusGeral.mensalistasCadastrados} cadastrados</p>
+            <p className="text-black">Convidados Pagos: {statusGeral.convidadosPagos} de {statusGeral.convidadosCadastrados} cadastrados</p>
+            <p className="text-black">Goleiros Isentos: {statusGeral.goleirosIsentos} de {statusGeral.goleirosCadastrados} cadastrados</p>
           </div>
         </div>
       </div>
