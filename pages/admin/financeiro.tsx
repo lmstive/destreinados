@@ -202,7 +202,6 @@ const AdminFinanceiroPage: React.FC = () => {
       }
     });
 
-    // CORREÇÃO: Lógica de ordenação customizada
     const roleOrder = {
       'Goleiro': 1,
       'Mensalista': 2,
@@ -216,7 +215,6 @@ const AdminFinanceiroPage: React.FC = () => {
       if (orderA < orderB) return -1;
       if (orderA > orderB) return 1;
 
-      // Se os papéis são os mesmos, ordena por nome
       return a.nome.localeCompare(b.nome);
     });
 
@@ -551,9 +549,10 @@ const AdminFinanceiroPage: React.FC = () => {
                             />
                           </td>
                           <td className="py-3 px-4 border-b border-gray-200">
+                            {/* CORREÇÃO: Substituído 'as any' pelo tipo correto para evitar erro de lint. */}
                             <select
                               value={editedPapel}
-                              onChange={(e) => setEditedPapel(e.target.value as any)}
+                              onChange={(e) => setEditedPapel(e.target.value as 'Mensalista' | 'Convidado' | 'Goleiro')}
                               className="w-full p-1 border border-gray-300 rounded-md"
                               style={{ color: 'black' }}
                             >
