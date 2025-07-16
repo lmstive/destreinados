@@ -74,8 +74,8 @@ const Estatuto = () => {
           <ul className="list-disc list-inside pl-4 mt-2 space-y-1">
             <li>O rateio é lei;</li>
             <li>O Pix é dever cívico;</li>
-            {/* CORREÇÃO AQUI: A frase com aspas foi colocada dentro de chaves {} e as aspas internas trocadas por &quot; */}
-            <li>Quem não pagar, leva <em className="italic">exposed</em> no grupo e figurinha personalizada com sua cara e a frase: {`"Esqueci o Pix, irmão..."`}</li>
+            {/* CORREÇÃO AQUI: A string com aspas foi colocada dentro de uma expressão JavaScript (`{''}`) para evitar o erro. */}
+            <li>Quem não pagar, leva <em className="italic">exposed</em> no grupo e figurinha personalizada com sua cara e a frase: {'"Esqueci o Pix, irmão..."'}</li>
           </ul>
         </div>
 
@@ -107,8 +107,8 @@ const Estatuto = () => {
             <p>Este estatuto foi aprovado por todos os membros que leram até aqui (ou não). Pode ser atualizado sempre que:</p>
             <ul className="list-none mt-2 space-y-1">
                 <li>A zoeira aumentar;</li>
-                {/* CORREÇÃO AQUI: A frase com aspas foi colocada dentro de chaves {} e as aspas internas trocadas por &quot; */}
-                <li>Ou o Xisto subir o preço do campo dizendo que {`"a inflação tá osso"`}</li>
+                {/* CORREÇÃO AQUI: A string com aspas foi colocada dentro de uma expressão JavaScript (`{''}`) para evitar o erro. */}
+                <li>Ou o Xisto subir o preço do campo dizendo que {'"a inflação tá osso"'}</li>
             </ul>
         </div>
 
