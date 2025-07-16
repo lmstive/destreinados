@@ -3,6 +3,12 @@
 import React from 'react';
 
 const Estatuto = () => {
+  // Para evitar qualquer erro de compilação, definimos as frases com aspas como variáveis.
+  // Isto garante que o JSX as trate como texto puro.
+  const fraseEquilibrados = 'Times são "equilibrados" (Nem sempre!)';
+  const fraseInflacao = 'Ou o Xisto subir o preço do campo dizendo que "a inflação tá osso"';
+  const frasePix = '"Esqueci o Pix, irmão..."';
+
   return (
     // Seção que envolve todo o estatuto
     <section className="bg-white p-6 md:p-8 rounded-lg shadow-md mt-8">
@@ -63,8 +69,9 @@ const Estatuto = () => {
           <ul className="list-disc list-inside pl-4 mt-2 space-y-1">
             <li>Partidas marcadas no grupo;</li>
             <li>Segunda-feira sai a lista no grupo, fique atento!</li>
-            <li>Quem confirmar primeiro, joga.</li>
-            <li>Times são "equilibrados" (Nem sempre!);</li>
+            <li>Quem confirmar primeiro, joga;</li>
+            {/* CORREÇÃO: Usando a variável para evitar o erro */}
+            <li>{fraseEquilibrados}</li>
             <li>Gols bonitos não valem mais, mas viram vídeo com trilha sonora dramática.</li>
           </ul>
         </div>
@@ -74,8 +81,8 @@ const Estatuto = () => {
           <ul className="list-disc list-inside pl-4 mt-2 space-y-1">
             <li>O rateio é lei;</li>
             <li>O Pix é dever cívico;</li>
-            {/* CORREÇÃO AQUI: A string com aspas foi colocada dentro de uma expressão JavaScript (`{''}`) para evitar o erro. */}
-            <li>Quem não pagar, leva <em className="italic">exposed</em> no grupo e figurinha personalizada com sua cara e a frase: {'"Esqueci o Pix, irmão..."'}</li>
+            {/* CORREÇÃO: Usando a variável para evitar o erro */}
+            <li>Quem não pagar, leva <em className="italic">exposed</em> no grupo e figurinha personalizada com sua cara e a frase: {frasePix}</li>
           </ul>
         </div>
 
@@ -107,8 +114,8 @@ const Estatuto = () => {
             <p>Este estatuto foi aprovado por todos os membros que leram até aqui (ou não). Pode ser atualizado sempre que:</p>
             <ul className="list-none mt-2 space-y-1">
                 <li>A zoeira aumentar;</li>
-                {/* CORREÇÃO AQUI: A string com aspas foi colocada dentro de uma expressão JavaScript (`{''}`) para evitar o erro. */}
-                <li>Ou o Xisto subir o preço do campo dizendo que {'"a inflação tá osso"'}</li>
+                {/* CORREÇÃO: Usando a variável para evitar o erro */}
+                <li>{fraseInflacao}</li>
             </ul>
         </div>
 
