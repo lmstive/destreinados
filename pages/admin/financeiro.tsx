@@ -5,10 +5,8 @@ import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import Head from 'next/head';
 import { supabase } from '../../lib/supabase'; // Importa 'supabase' do arquivo lib/supabase.ts
-// CORRIGIDO: Removido XCircleIcon pois não é usado diretamente aqui
-// CORRIGIDO: CheckCircleIcon é usado no span de status 'Pago'/'Isento'
-// CORRIGIDO: PendenteIcon (ClockIcon as PendenteIcon) é usado no span de status 'Pendente'
-import { CheckCircleIcon, ClockIcon as PendenteIcon } from '@heroicons/react/24/solid'; // Ícones preenchidos
+// CORREÇÃO: Removidos 'CheckCircleIcon' e 'PendenteIcon' pois não estavam sendo usados no JSX.
+// Para usá-los, você precisaria adicioná-los dentro da tabela, ao lado do texto de status.
 import Link from 'next/link';
 
 interface Pagamento { 
@@ -81,7 +79,6 @@ const AdminFinanceiroPage: React.FC = () => {
       if (fetchError) throw fetchError;
 
       setPagamentos(pagamentosData || []);
-      // console.log("Dados brutos de pagamentos carregados:", pagamentosData); // Removido console.log em produção
 
     } catch (err: unknown) { 
       console.error("Erro ao carregar pagamentos:", (err as Error).message);
@@ -97,9 +94,10 @@ const AdminFinanceiroPage: React.FC = () => {
   }, [fetchPagamentos]);
 
   // Processa os pagamentos brutos para gerar a lista de participantes para exibição
+  // CORREÇÃO: Removidas as dependências 'valorMensalidade' e 'valorJogoAvulso' pois são constantes definidas fora do componente.
   useEffect(() => {
-    if (loading && pagamentos.length === 0) return; // Não processa enquanto os dados ainda estão sendo carregados e não há pagamentos
-    if (!pagamentos.length && !loading) { // Se não há pagamentos e já terminou de carregar
+    if (loading && pagamentos.length === 0) return;
+    if (!pagamentos.length && !loading) {
         setParticipantesFinanceiros([]);
         setTotalArrecadado(0);
         setStatusGeral({
@@ -175,7 +173,6 @@ const AdminFinanceiroPage: React.FC = () => {
         } else {
           statusMesAtual = 'Pendente';
         }
-        // Definir valor inicial para participantes sem registro no mês atual
         if (papel === 'Mensalista') valorRegistrado = valorMensalidade;
         else if (papel === 'Convidado') valorRegistrado = valorJogoAvulso;
         else if (papel === 'Goleiro') valorRegistrado = 0; 
@@ -217,10 +214,8 @@ const AdminFinanceiroPage: React.FC = () => {
     setParticipantesFinanceiros(currentParticipantes.sort((a, b) => a.nome.localeCompare(b.nome)));
     setTotalArrecadado(currentTotalArrecadado);
     setStatusGeral(currentStatusGeral);
-    // console.log("Participantes processados:", currentParticipantes); // Removido console.log em produção
-    // console.log("Status Geral:", currentStatusGeral); // Removido console.log em produção
 
-  }, [pagamentos, mesAno, loading, valorMensalidade, valorJogoAvulso]); 
+  }, [pagamentos, mesAno, loading]); 
 
   // Lidar com a mudança do mês/ano
   const handleMesAnoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -390,12 +385,10 @@ const AdminFinanceiroPage: React.FC = () => {
     }
   };
 
-  // Mostra mensagem de carregamento enquanto a sessão é verificada ou dados são carregados
   if (status === 'loading' || !session) { 
     return <Layout><p className="p-8 text-center text-gray-700">Verificando permissão e carregando Controle Financeiro...</p></Layout>;
   }
 
-  // Se não estiver autenticado após carregar, redireciona
   if (!session) {
     router.push('/');
     return null; 
@@ -410,7 +403,6 @@ const AdminFinanceiroPage: React.FC = () => {
 
       {error && <p className="text-red-500 mb-4 p-2 bg-red-100 rounded">{error}</p>}
 
-      {/* Formulário para Adicionar Novo Participante Financeiro */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Adicionar Novo Participante Financeiro</h2>
         <form onSubmit={handleAddParticipante} className="space-y-4">
@@ -449,7 +441,6 @@ const AdminFinanceiroPage: React.FC = () => {
         </form>
       </div>
 
-      {/* Visão Geral dos Pagamentos */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Visão Geral dos Pagamentos</h2>
         <div className="mb-4">
@@ -459,7 +450,8 @@ const AdminFinanceiroPage: React.FC = () => {
             id="mesAno"
             className="mt-1 block w-40 border border-gray-300 rounded-md shadow-sm p-2 text-black placeholder-gray-500"
             value={mesAno}
-            onChange={(e) => setMesAno(e.target.value)}
+            // CORREÇÃO: Utilizando a função handleMesAnoChange que já estava definida.
+            onChange={handleMesAnoChange}
             placeholder="MM/AAAA"
           />
         </div>
@@ -480,7 +472,6 @@ const AdminFinanceiroPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Status de Pagamento por Participante */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status de Pagamento por Participante</h2>
         {!loading && participantesFinanceiros.length === 0 ? ( 
