@@ -6,13 +6,10 @@ import Layout from '../../components/Layout';
 import Head from 'next/head';
 import { supabase } from '../../lib/supabase'; // Importa 'supabase' do arquivo lib/supabase.ts
 // CORRIGIDO: Removido XCircleIcon pois não é usado diretamente aqui
-// CORRIGIDO: CheckCircleIcon e PendenteIcon são agora usados diretamente nos spans
-import { CheckCircleIcon, ClockIcon as PendenteIcon } from '@heroicons/react/24/solid'; // Alterado para /24/solid para ícones preenchidos
+// CORRIGIDO: CheckCircleIcon é usado no span de status 'Pago'/'Isento'
+// CORRIGIDO: PendenteIcon (ClockIcon as PendenteIcon) é usado no span de status 'Pendente'
+import { CheckCircleIcon, ClockIcon as PendenteIcon } from '@heroicons/react/24/solid'; // Ícones preenchidos
 import Link from 'next/link';
-
-// Interfaces para os tipos de dados
-// CORRIGIDO: Removida interface Jogador, pois não é usada diretamente aqui
-// interface Jogador { /* ... */ } 
 
 interface Pagamento { 
   id: string;
@@ -64,6 +61,7 @@ const AdminFinanceiroPage: React.FC = () => {
   const [novoParticipantePapel, setNovoParticipantePapel] = useState<'Mensalista' | 'Convidado' | 'Goleiro'>('Mensalista');
   const [adicionarParticipanteError, setAdicionarParticipanteError] = useState<string | null>(null);
 
+  // Redirecionamento se não estiver autenticado
   useEffect(() => {
     if (status === 'loading') return;
     if (!session) {
@@ -76,7 +74,6 @@ const AdminFinanceiroPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // CORRIGIDO: Usado 'pagamentosData' e 'fetchError' para evitar variáveis 'data' e 'error' não usadas
       const { data: pagamentosData, error: fetchError } = await supabase
         .from('pagamentos')
         .select('*');
@@ -84,9 +81,9 @@ const AdminFinanceiroPage: React.FC = () => {
       if (fetchError) throw fetchError;
 
       setPagamentos(pagamentosData || []);
-      console.log("Dados brutos de pagamentos carregados:", pagamentosData);
+      // console.log("Dados brutos de pagamentos carregados:", pagamentosData); // Removido console.log em produção
 
-    } catch (err: unknown) { // CORRIGIDO: Tipado o catch como 'unknown' e feito o cast para Error
+    } catch (err: unknown) { 
       console.error("Erro ao carregar pagamentos:", (err as Error).message);
       setError("Erro ao carregar dados de pagamentos: " + (err as Error).message);
     } finally {
@@ -99,11 +96,10 @@ const AdminFinanceiroPage: React.FC = () => {
     fetchPagamentos();
   }, [fetchPagamentos]);
 
-  // Lógica para processar os pagamentos e gerar a lista de participantes
+  // Processa os pagamentos brutos para gerar a lista de participantes para exibição
   useEffect(() => {
-    // CORRIGIDO: Ajustado a condição de retorno para evitar processamento desnecessário
-    if (loading && pagamentos.length === 0) return;
-    if (!pagamentos.length && !loading) {
+    if (loading && pagamentos.length === 0) return; // Não processa enquanto os dados ainda estão sendo carregados e não há pagamentos
+    if (!pagamentos.length && !loading) { // Se não há pagamentos e já terminou de carregar
         setParticipantesFinanceiros([]);
         setTotalArrecadado(0);
         setStatusGeral({
@@ -172,7 +168,7 @@ const AdminFinanceiroPage: React.FC = () => {
         tipoRegistro = pagamentoPendente.tipo_registro;
         idPagamento = pagamentoPendente.id;
       }
-      
+
       if (!pagamentoPago && !pagamentoIsento && !pagamentoPendente) {
         if (papel === 'Goleiro') {
           statusMesAtual = 'Isento';
@@ -221,8 +217,8 @@ const AdminFinanceiroPage: React.FC = () => {
     setParticipantesFinanceiros(currentParticipantes.sort((a, b) => a.nome.localeCompare(b.nome)));
     setTotalArrecadado(currentTotalArrecadado);
     setStatusGeral(currentStatusGeral);
-    console.log("Participantes processados:", currentParticipantes); 
-    console.log("Status Geral:", currentStatusGeral); 
+    // console.log("Participantes processados:", currentParticipantes); // Removido console.log em produção
+    // console.log("Status Geral:", currentStatusGeral); // Removido console.log em produção
 
   }, [pagamentos, mesAno, loading, valorMensalidade, valorJogoAvulso]); 
 
@@ -398,7 +394,7 @@ const AdminFinanceiroPage: React.FC = () => {
   if (status === 'loading' || !session) { 
     return <Layout><p className="p-8 text-center text-gray-700">Verificando permissão e carregando Controle Financeiro...</p></Layout>;
   }
-  
+
   // Se não estiver autenticado após carregar, redireciona
   if (!session) {
     router.push('/');
@@ -490,60 +486,62 @@ const AdminFinanceiroPage: React.FC = () => {
         {!loading && participantesFinanceiros.length === 0 ? ( 
           <p className="text-gray-600">Nenhum participante financeiro cadastrado ou encontrado para este mês. Use o formulário acima para adicionar.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white">
-              <thead>
-                <tr>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">NOME DO PARTICIPANTE</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">PAPEL</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">STATUS ({mesAno})</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">VALOR REGISTRADO</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">TIPO REG.</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">AÇÃO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {participantesFinanceiros.map((participante, index) => (
-                  <tr key={`${participante.nome}-${participante.papel}-${index}`} className="hover:bg-gray-50">
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.nome}</td>
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.papel}</td>
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        participante.statusMesAtual === 'Pago' ? 'bg-green-100 text-green-800' :
-                        participante.statusMesAtual === 'Pendente' ? 'bg-red-100 text-red-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
-                        {participante.statusMesAtual}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">
-                      {participante.valorRegistrado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </td>
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.tipoRegistro || '-'}</td>
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm">
-                      <button
-                        onClick={() => handleTogglePagamento(participante)}
-                        className={`py-1 px-3 rounded-md text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-opacity-50 mr-2 ${
-                          participante.statusMesAtual === 'Pago' ? 'bg-orange-500 hover:bg-orange-600 focus:ring-orange-400' :
-                          'bg-blue-500 hover:bg-blue-600 focus:ring-blue-400'
-                        }`}
-                        disabled={loading}
-                      >
-                        {participante.statusMesAtual === 'Pago' ? 'Desmarcar Pago' : 'Marcar como Pago'}
-                      </button>
-                      <button
-                        onClick={() => handleDeleteParticipante(participante.nome, participante.papel)}
-                        className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50"
-                        disabled={loading}
-                      >
-                        Excluir
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            !loading && ( 
+                <div className="overflow-x-auto">
+                    <table className="min-w-full bg-white">
+                    <thead>
+                        <tr>
+                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">NOME DO PARTICIPANTE</th>
+                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">PAPEL</th>
+                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">STATUS ({mesAno})</th>
+                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">VALOR REGISTRADO</th>
+                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">TIPO REG.</th>
+                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">AÇÃO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {participantesFinanceiros.map((participante, index) => (
+                        <tr key={`${participante.nome}-${participante.papel}-${index}`} className="hover:bg-gray-50">
+                            <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.nome}</td>
+                            <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.papel}</td>
+                            <td className="py-3 px-4 border-b border-gray-200 text-sm">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                participante.statusMesAtual === 'Pago' ? 'bg-green-100 text-green-800' :
+                                participante.statusMesAtual === 'Pendente' ? 'bg-red-100 text-red-800' :
+                                'bg-blue-100 text-blue-800'
+                            }`}>
+                                {participante.statusMesAtual}
+                            </span>
+                            </td>
+                            <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">
+                            {participante.valorRegistrado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                            <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.tipoRegistro || '-'}</td>
+                            <td className="py-3 px-4 border-b border-gray-200 text-sm">
+                            <button
+                                onClick={() => handleTogglePagamento(participante)}
+                                className={`py-1 px-3 rounded-md text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-opacity-50 mr-2 ${
+                                participante.statusMesAtual === 'Pago' ? 'bg-orange-500 hover:bg-orange-600 focus:ring-orange-400' :
+                                'bg-blue-500 hover:bg-blue-600 focus:ring-blue-400'
+                                }`}
+                                disabled={loading}
+                            >
+                                {participante.statusMesAtual === 'Pago' ? 'Desmarcar Pago' : 'Marcar como Pago'}
+                            </button>
+                            <button
+                                onClick={() => handleDeleteParticipante(participante.nome, participante.papel)}
+                                className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50"
+                                disabled={loading}
+                            >
+                                Excluir
+                            </button>
+                            </td>
+                        </tr>
+                        ))}
+                    </tbody>
+                    </table>
+                </div>
+            )
         )}
       </div>
 
