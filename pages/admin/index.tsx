@@ -39,6 +39,8 @@ const AdminDashboardPage: React.FC = () => {
           Esta é a área restrita para gerenciamento do site do Destreinados FC.
         </p>
         <ul className="list-disc list-inside text-gray-700 space-y-2">
+          {/* NOVO LINK PARA O CONTROLE FINANCEIRO */}
+          <li><Link href="/admin/financeiro" className="text-blue-600 hover:underline font-semibold">Controle Financeiro</Link></li>
           <li><Link href="/admin/presenca" className="text-blue-600 hover:underline font-semibold">Gerar Mensagem de Confirmação de Presença</Link></li>
           <li><Link href="/admin/jogadores" className="text-blue-600 hover:underline">Gerenciar Jogadores</Link></li>
           <li><Link href="/admin/galeria" className="text-blue-600 hover:underline">Gerenciar Galeria de Fotos</Link></li>
