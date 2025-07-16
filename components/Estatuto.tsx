@@ -74,7 +74,8 @@ const Estatuto = () => {
           <ul className="list-disc list-inside pl-4 mt-2 space-y-1">
             <li>O rateio é lei;</li>
             <li>O Pix é dever cívico;</li>
-            <li>Quem não pagar, leva <em className="italic">exposed</em> no grupo e figurinha personalizada com sua cara e a frase: "Esqueci o Pix, irmão..."</li>
+            {/* CORREÇÃO AQUI: Troquei as aspas da frase por seus códigos HTML */}
+            <li>Quem não pagar, leva <em className="italic">exposed</em> no grupo e figurinha personalizada com sua cara e a frase: &quot;Esqueci o Pix, irmão...&quot;</li>
           </ul>
         </div>
 
@@ -106,7 +107,8 @@ const Estatuto = () => {
             <p>Este estatuto foi aprovado por todos os membros que leram até aqui (ou não). Pode ser atualizado sempre que:</p>
             <ul className="list-none mt-2 space-y-1">
                 <li>A zoeira aumentar;</li>
-                <li>Ou o Xisto subir o preço do campo dizendo que “a inflação tá osso”.</li>
+                 {/* CORREÇÃO AQUI: Troquei as aspas curvas por seus códigos HTML */}
+                <li>Ou o Xisto subir o preço do campo dizendo que &ldquo;a inflação tá osso&rdquo;.</li>
             </ul>
         </div>
 
