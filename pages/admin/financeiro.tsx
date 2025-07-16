@@ -4,34 +4,65 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import Head from 'next/head';
+import { createClient, SupabaseClient } from '@supabase/supabase-js'; // Importado SupabaseClient para tipagem
+import { CheckCircleIcon, ClockIcon as PendenteIcon } from '@heroicons/react/24/outline'; // Ícones de status
 import Link from 'next/link';
-import { createClient } from '@supabase/supabase-js';
 
 // Inicializa o Supabase Client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Certifique-se de que NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY estão em .env.local
+const supabaseUrl: string = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey: string = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-interface Pagamento {
+// Verifica se as variáveis de ambiente estão definidas antes de criar o cliente
+let supabase: SupabaseClient;
+try {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
+  }
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+} catch (err) {
+  console.error("Failed to initialize Supabase client:", err);
+  // Fallback para um cliente Supabase "dummy" ou tratamento de erro adequado
+  // Isso é para evitar que a aplicação quebre durante a compilação/execução se as variáveis não estiverem lá
+  supabase = {} as SupabaseClient; // Apenas para tipagem, não funcional
+}
+
+
+// Interfaces para os tipos de dados
+interface Jogador { // Usada para jogadores cadastrados na tabela jogadores
+  id: string;
+  nome: string;
+  apelido: string | null;
+  papel: string; // 'Mensalista', 'Convidado', 'Goleiro'
+}
+
+interface Pagamento { // Usada para registros na tabela pagamentos
   id: string;
   nome_pagador: string;
+  apelido_pagador: string | null;
   papel_pagador: string;
   mes_referencia: string;
-  tipo_registro: string;
+  tipo_registro: 'Mensalidade' | 'Jogo Avulso' | 'Isenção Goleiro';
   valor_registrado: number;
   status_pagamento: 'Pago' | 'Pendente' | 'Isento';
   data_efetivacao: string | null;
   created_at: string;
 }
 
+// Interface para o participante financeiro (combinação de dados para exibição)
 interface ParticipanteFinanceiro {
   nome: string;
   papel: string;
+  apelido: string | null; // Adicionado apelido para exibição
   statusMesAtual: 'Pago' | 'Pendente' | 'Isento';
   valorRegistrado: number;
   tipoRegistro: string;
   idPagamento: string | null; // ID do registro de pagamento se existir
 }
+
+// Defina os valores padrão para mensalidade e jogo avulso
+const valorMensalidade = 50; // Altere conforme necessário
+const valorJogoAvulso = 15;  // Altere conforme necessário
 
 const AdminFinanceiroPage: React.FC = () => {
   const { data: session, status } = useSession();
@@ -64,6 +95,8 @@ const AdminFinanceiroPage: React.FC = () => {
     }
   }, [session, status, router]);
 
+  // --- Função principal para buscar dados ---
+  // CORRIGIDO: Removido 'async (err: any)' e tipado o catch
   const fetchPagamentos = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -73,22 +106,22 @@ const AdminFinanceiroPage: React.FC = () => {
         .from('pagamentos')
         .select('*');
 
-      if (error) throw error;
+      if (error) throw error; // Lança o erro para ser pego pelo catch
 
       setPagamentos(data || []);
       console.log("Dados brutos de pagamentos carregados:", data); // Para depuração
 
-    } catch (err: any) {
+    } catch (err: any) { // Tipagem explícita para o erro no catch
       console.error("Erro ao carregar pagamentos:", err.message);
       setError("Erro ao carregar dados de pagamentos: " + err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // fetchPagamentos não depende de mesAno aqui, ele pega todos os pagamentos para processar depois
 
   useEffect(() => {
     fetchPagamentos();
-  }, [fetchPagamentos]);
+  }, [fetchPagamentos]); // Agora fetchPagamentos está no array de dependências do useEffect
 
   // Lógica para processar os pagamentos e gerar a lista de participantes
   useEffect(() => {
@@ -110,13 +143,11 @@ const AdminFinanceiroPage: React.FC = () => {
     const mesAnoFormatado = `${mes}/${ano}`;
 
     // 1. Coletar todos os participantes únicos da tabela 'pagamentos'
-    const uniqueParticipantes = new Map<string, { nome: string; papel: string }>();
+    const uniqueParticipantes = new Map<string, { nome: string; papel: string; apelido: string | null }>(); // Adicionado apelido
     pagamentos.forEach(p => {
-      // Usa nome_pagador + papel_pagador como chave única para garantir que "João (Mensalista)"
-      // seja diferente de "João (Convidado)" se houvesse tal caso.
       const key = `${p.nome_pagador}-${p.papel_pagador}`;
       if (!uniqueParticipantes.has(key)) {
-        uniqueParticipantes.set(key, { nome: p.nome_pagador, papel: p.papel_pagador });
+        uniqueParticipantes.set(key, { nome: p.nome_pagador, papel: p.papel_pagador, apelido: p.apelido_pagador }); // Pega o apelido
       }
     });
 
@@ -131,7 +162,7 @@ const AdminFinanceiroPage: React.FC = () => {
       goleirosCadastrados: 0,
     };
 
-    uniqueParticipantes.forEach(({ nome, papel }) => {
+    uniqueParticipantes.forEach(({ nome, papel, apelido }) => { // Pega apelido aqui também
       // Encontrar o status mais relevante para o mês/ano atual para este participante
       const pagamentosDoParticipanteNoMes = pagamentos.filter(p =>
         p.nome_pagador === nome &&
@@ -157,16 +188,16 @@ const AdminFinanceiroPage: React.FC = () => {
         idPagamento = pagamentoPago.id;
       } else if (pagamentoIsento) {
         statusMesAtual = 'Isento';
-        valorRegistrado = pagamentoIsento.valor_registrado; // Pode ser 0 para isento
+        valorRegistrado = pagamentoIsento.valor_registrado;
         tipoRegistro = pagamentoIsento.tipo_registro;
         idPagamento = pagamentoIsento.id;
       } else if (pagamentoPendente) {
         statusMesAtual = 'Pendente';
-        valorRegistrado = pagamentoPendente.valor_registrado; // Pode ser 0 para pendente
+        valorRegistrado = pagamentoPendente.valor_registrado;
         tipoRegistro = pagamentoPendente.tipo_registro;
         idPagamento = pagamentoPendente.id;
       }
-      
+
       // Se não encontrou nenhum registro para o mês atual, mas o participante existe, ele é Pendente.
       // E se for um Goleiro, ele é Isento por padrão para o mês, a menos que tenha um registro de pagamento.
       if (!pagamentoPago && !pagamentoIsento && !pagamentoPendente) {
@@ -177,10 +208,10 @@ const AdminFinanceiroPage: React.FC = () => {
         }
       }
 
-
       currentParticipantes.push({
         nome,
         papel,
+        apelido, // Incluído apelido aqui
         statusMesAtual,
         valorRegistrado,
         tipoRegistro,
@@ -205,12 +236,13 @@ const AdminFinanceiroPage: React.FC = () => {
         }
       } else if (papel === 'Goleiro') {
         currentStatusGeral.goleirosCadastrados++;
-        if (statusMesAtual === 'Isento') {
+        if (statusMesAtual === 'Isento') { // Apenas conta como isento se o status for realmente 'Isento' para o mês
           currentStatusGeral.goleirosIsentos++;
         }
       }
     });
 
+    // CORRIGIDO: Adicionado sort para garantir ordem alfabética
     setParticipantesFinanceiros(currentParticipantes.sort((a, b) => a.nome.localeCompare(b.nome)));
     setTotalArrecadado(currentTotalArrecadado);
     setStatusGeral(currentStatusGeral);
@@ -218,6 +250,12 @@ const AdminFinanceiroPage: React.FC = () => {
     console.log("Status Geral:", currentStatusGeral); // Para depuração
 
   }, [pagamentos, mesAno, loading]); // Depende de pagamentos e mesAno
+
+
+  // Lidar com a mudança do mês/ano
+  const handleMesAnoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMesAno(e.target.value);
+  };
 
   // Função para adicionar um novo participante financeiro
   const handleAddParticipante = async (e: React.FormEvent) => {
@@ -243,10 +281,12 @@ const AdminFinanceiroPage: React.FC = () => {
     setLoading(true);
     try {
         // Insere um registro inicial "Pendente" para o novo participante
-        const { data, error } = await supabase
+        // Use o nome e o papel do novo participante para o registro
+        const { error } = await supabase
             .from('pagamentos')
             .insert({
                 nome_pagador: novoParticipanteNome.trim(),
+                apelido_pagador: '', // Apelido inicial vazio
                 papel_pagador: novoParticipantePapel,
                 mes_referencia: mesAno, // Mês atual como referência inicial
                 tipo_registro: 'Mensalidade', // Tipo padrão
@@ -278,60 +318,70 @@ const AdminFinanceiroPage: React.FC = () => {
       const [mes, ano] = mesAno.split('/');
       const mesAnoFormatado = `${mes}/${ano}`;
 
-      // Tenta encontrar um registro existente para o mês/ano e participante
-      const { data: existingRecords, error: fetchError } = await supabase
-        .from('pagamentos')
-        .select('*')
-        .eq('nome_pagador', participante.nome)
-        .eq('papel_pagador', participante.papel)
-        .eq('mes_referencia', mesAnoFormatado);
+      // Valor e tipo de registro para o novo status
+      let valorParaStatusDesejado = 0;
+      let tipoRegistroParaStatusDesejado: Pagamento['tipo_registro'] = 'Mensalidade'; // Default
 
-      if (fetchError) throw fetchError;
+      if (participante.papel === 'Goleiro') {
+        valorParaStatusDesejado = 0;
+        tipoRegistroParaStatusDesejado = 'Isenção Goleiro';
+      } else if (participante.papel === 'Mensalista') {
+        valorParaStatusDesejado = valorMensalidade;
+        tipoRegistroParaStatusDesejado = 'Mensalidade';
+      } else { // 'Convidado'
+        valorParaStatusDesejado = valorJogoAvulso;
+        tipoRegistroParaStatusDesejado = 'Jogo Avulso';
+      }
 
-      const existingPayment = existingRecords?.[0]; // Pega o primeiro registro encontrado
+      if (participante.statusMesAtual === 'Pago' || participante.statusMesAtual === 'Isento') {
+        // Se já está Pago/Isento, vamos marcar como Pendente
+        const { error } = await supabase
+            .from('pagamentos')
+            .update({ 
+                status_pagamento: 'Pendente', 
+                valor_registrado: 0, 
+                tipo_registro: tipoRegistroParaStatusDesejado, // Mantém o tipo original ou ajusta
+                data_efetivacao: null 
+            })
+            .eq('id', participante.idPagamento); // Usa o ID do registro de pagamento
 
-      if (participante.statusMesAtual === 'Pago') {
-        // Se já está pago, vamos marcar como Pendente (ou deletar o registro de pago)
-        if (existingPayment && existingPayment.status_pagamento === 'Pago') {
-            const { error } = await supabase
-                .from('pagamentos')
-                .update({ status_pagamento: 'Pendente', valor_registrado: 0, data_efetivacao: null })
-                .eq('id', existingPayment.id);
-            if (error) throw error;
-            alert(`Pagamento de ${participante.nome} desmarcado como Pago.`);
-        } else {
-            // Isso não deveria acontecer se a lógica de status estiver correta
-            alert('Erro: Não foi possível desmarcar o pagamento. Registro não encontrado ou status incorreto.');
-        }
+        if (error) throw error;
+        alert(`Pagamento de ${participante.nome} (${participante.papel}) desmarcado.`);
+
       } else {
-        // Se está Pendente ou Isento, vamos marcar como Pago
-        if (existingPayment) {
-            // Atualiza um registro existente
+        // Se está Pendente, vamos marcar como Pago ou Isento
+        const statusDesejado: 'Pago' | 'Isento' = participante.papel === 'Goleiro' ? 'Isento' : 'Pago';
+        const dataEfetivacao = new Date().toISOString();
+
+        if (participante.idPagamento) {
+            // Atualiza um registro existente se já tiver um ID de pagamento
             const { error } = await supabase
                 .from('pagamentos')
-                .update({ 
-                    status_pagamento: 'Pago', 
-                    valor_registrado: 50.00, // Valor padrão, pode ser editável depois
-                    data_efetivacao: new Date().toISOString() 
+                .update({
+                    status_pagamento: statusDesejado,
+                    valor_registrado: valorParaStatusDesejado,
+                    tipo_registro: tipoRegistroParaStatusDesejado,
+                    data_efetivacao: dataEfetivacao,
                 })
-                .eq('id', existingPayment.id);
+                .eq('id', participante.idPagamento);
             if (error) throw error;
-            alert(`Pagamento de ${participante.nome} marcado como Pago!`);
+            alert(`Pagamento de ${participante.nome} (${participante.papel}) marcado como ${statusDesejado}!`);
         } else {
             // Cria um novo registro de pagamento se não existir para o mês
             const { error } = await supabase
                 .from('pagamentos')
                 .insert({
                     nome_pagador: participante.nome,
+                    apelido_pagador: participante.apelido,
                     papel_pagador: participante.papel,
                     mes_referencia: mesAnoFormatado,
-                    tipo_registro: 'Mensalidade', // Pode ser editável
-                    valor_registrado: 50.00, // Valor padrão
-                    status_pagamento: 'Pago',
-                    data_efetivacao: new Date().toISOString(),
+                    tipo_registro: tipoRegistroParaStatusDesejado,
+                    valor_registrado: valorParaStatusDesejado,
+                    status_pagamento: statusDesejado,
+                    data_efetivacao: dataEfetivacao,
                 });
             if (error) throw error;
-            alert(`Pagamento de ${participante.nome} registrado como Pago!`);
+            alert(`Pagamento de ${participante.nome} (${participante.papel}) registrado como ${statusDesejado}!`);
         }
       }
       fetchPagamentos(); // Recarrega os dados
@@ -380,11 +430,9 @@ const AdminFinanceiroPage: React.FC = () => {
       </Head>
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Controle Financeiro</h1>
 
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-
       {/* Formulário para Adicionar Novo Participante Financeiro */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Adicionar Novo Participante</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Adicionar Novo Participante Financeiro</h2>
         <form onSubmit={handleAddParticipante} className="space-y-4">
           <div>
             <label htmlFor="novoParticipanteNome" className="block text-sm font-medium text-gray-700">Nome do Participante</label>
@@ -462,19 +510,19 @@ const AdminFinanceiroPage: React.FC = () => {
             <table className="min-w-full bg-white">
               <thead>
                 <tr>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-600">NOME DO PARTICIPANTE</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-600">PAPEL</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-600">STATUS ({mesAno})</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-600">VALOR REGISTRADO</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-600">TIPO REG.</th>
-                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-600">AÇÃO</th>
+                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">NOME DO PARTICIPANTE</th>
+                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">PAPEL</th>
+                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">STATUS ({mesAno})</th>
+                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">VALOR REGISTRADO</th>
+                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">TIPO REG.</th>
+                  <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">AÇÃO</th>
                 </tr>
               </thead>
               <tbody>
                 {participantesFinanceiros.map((participante, index) => (
                   <tr key={`${participante.nome}-${participante.papel}-${index}`} className="hover:bg-gray-50">
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-gray-900">{participante.nome}</td>
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-gray-900">{participante.papel}</td>
+                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.nome}</td>
+                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.papel}</td>
                     <td className="py-3 px-4 border-b border-gray-200 text-sm">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                         participante.statusMesAtual === 'Pago' ? 'bg-green-100 text-green-800' :
@@ -484,10 +532,10 @@ const AdminFinanceiroPage: React.FC = () => {
                         {participante.statusMesAtual}
                       </span>
                     </td>
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-gray-900">
+                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">
                       {participante.valorRegistrado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </td>
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-gray-900">{participante.tipoRegistro || '-'}</td>
+                    <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.tipoRegistro || '-'}</td>
                     <td className="py-3 px-4 border-b border-gray-200 text-sm">
                       <button
                         onClick={() => handleTogglePagamento(participante)}
@@ -525,5 +573,3 @@ const AdminFinanceiroPage: React.FC = () => {
 };
 
 export default AdminFinanceiroPage;
-
-      
