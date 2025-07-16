@@ -4,15 +4,13 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import Head from 'next/head';
-import { supabase } from '../../lib/supabase'; // Importa 'supabase' do arquivo lib/supabase.ts
-// CORREÇÃO: Removidos 'CheckCircleIcon' e 'PendenteIcon' pois não estavam sendo usados no JSX.
-// Para usá-los, você precisaria adicioná-los dentro da tabela, ao lado do texto de status.
+import { supabase } from '../../lib/supabase';
 import Link from 'next/link';
 
 interface Pagamento { 
   id: string;
   nome_pagador: string;
-  apelido_pagador: string | null;
+  // REMOVIDO: apelido_pagador pois a coluna não existe no banco de dados.
   papel_pagador: 'Mensalista' | 'Convidado' | 'Goleiro';
   mes_referencia: string;
   tipo_registro: 'Mensalidade' | 'Jogo Avulso' | 'Isenção Goleiro';
@@ -25,14 +23,13 @@ interface Pagamento {
 interface ParticipanteFinanceiro {
   nome: string;
   papel: 'Mensalista' | 'Convidado' | 'Goleiro';
-  apelido: string | null;
+  // REMOVIDO: apelido pois a coluna não existe no banco de dados.
   statusMesAtual: 'Pago' | 'Pendente' | 'Isento';
-  valorRegistrado: number; // Valor que deve ser pago ou foi registrado
+  valorRegistrado: number; 
   tipoRegistro: string;
   idPagamento: string | null;
 }
 
-// Valores fixos de pagamento (declarados fora do componente)
 const valorMensalidade = 50; 
 const valorJogoAvulso = 15;  
 
@@ -41,8 +38,8 @@ const AdminFinanceiroPage: React.FC = () => {
   const router = useRouter();
 
   const [mesAno, setMesAno] = useState<string>(new Date().toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }).replace('/', '/'));
-  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]); // Pagamentos brutos da DB
-  const [participantesFinanceiros, setParticipantesFinanceiros] = useState<ParticipanteFinanceiro[]>([]); // Lista processada para exibição
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
+  const [participantesFinanceiros, setParticipantesFinanceiros] = useState<ParticipanteFinanceiro[]>([]);
   const [totalArrecadado, setTotalArrecadado] = useState<number>(0);
   const [statusGeral, setStatusGeral] = useState({
     mensalistasPagos: 0,
@@ -59,7 +56,6 @@ const AdminFinanceiroPage: React.FC = () => {
   const [novoParticipantePapel, setNovoParticipantePapel] = useState<'Mensalista' | 'Convidado' | 'Goleiro'>('Mensalista');
   const [adicionarParticipanteError, setAdicionarParticipanteError] = useState<string | null>(null);
 
-  // Redirecionamento se não estiver autenticado
   useEffect(() => {
     if (status === 'loading') return;
     if (!session) {
@@ -67,7 +63,6 @@ const AdminFinanceiroPage: React.FC = () => {
     }
   }, [session, status, router]);
 
-  // Função principal para buscar todos os registros de pagamentos
   const fetchPagamentos = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -86,15 +81,12 @@ const AdminFinanceiroPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []); // Sem dependências para ser estável para o useEffect
+  }, []);
 
-  // Carrega todos os pagamentos na montagem inicial
   useEffect(() => {
     fetchPagamentos();
   }, [fetchPagamentos]);
 
-  // Processa os pagamentos brutos para gerar a lista de participantes para exibição
-  // CORREÇÃO: Removidas as dependências 'valorMensalidade' e 'valorJogoAvulso' pois são constantes definidas fora do componente.
   useEffect(() => {
     if (loading && pagamentos.length === 0) return;
     if (!pagamentos.length && !loading) {
@@ -114,11 +106,12 @@ const AdminFinanceiroPage: React.FC = () => {
     const [mes, ano] = mesAno.split('/');
     const mesAnoFormatado = `${mes}/${ano}`;
 
-    const uniqueParticipantes = new Map<string, { nome: string; papel: 'Mensalista' | 'Convidado' | 'Goleiro'; apelido: string | null }>();
+    // REMOVIDO: 'apelido' da lógica de participantes únicos.
+    const uniqueParticipantes = new Map<string, { nome: string; papel: 'Mensalista' | 'Convidado' | 'Goleiro'; }>();
     pagamentos.forEach(p => {
       const key = `${p.nome_pagador}-${p.papel_pagador}`;
       if (!uniqueParticipantes.has(key)) {
-        uniqueParticipantes.set(key, { nome: p.nome_pagador, papel: p.papel_pagador, apelido: p.apelido_pagador });
+        uniqueParticipantes.set(key, { nome: p.nome_pagador, papel: p.papel_pagador });
       }
     });
 
@@ -133,7 +126,8 @@ const AdminFinanceiroPage: React.FC = () => {
       goleirosCadastrados: 0,
     };
 
-    uniqueParticipantes.forEach(({ nome, papel, apelido }) => {
+    // REMOVIDO: 'apelido' da desestruturação.
+    uniqueParticipantes.forEach(({ nome, papel }) => {
       const pagamentosDoParticipanteNoMes = pagamentos.filter(p =>
         p.nome_pagador === nome &&
         p.papel_pagador === papel &&
@@ -178,11 +172,10 @@ const AdminFinanceiroPage: React.FC = () => {
         else if (papel === 'Goleiro') valorRegistrado = 0; 
       }
 
-
+      // REMOVIDO: 'apelido' da criação do objeto do participante.
       currentParticipantes.push({
         nome,
         papel,
-        apelido, 
         statusMesAtual,
         valorRegistrado,
         tipoRegistro,
@@ -217,12 +210,10 @@ const AdminFinanceiroPage: React.FC = () => {
 
   }, [pagamentos, mesAno, loading]); 
 
-  // Lidar com a mudança do mês/ano
   const handleMesAnoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setMesAno(e.target.value);
   }, []); 
 
-  // Função para adicionar um novo participante financeiro
   const handleAddParticipante = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdicionarParticipanteError(null);
@@ -250,7 +241,7 @@ const AdminFinanceiroPage: React.FC = () => {
             .from('pagamentos')
             .insert({
                 nome_pagador: nomeFormatado,
-                apelido_pagador: null, 
+                // REMOVIDO: 'apelido_pagador' da inserção. Esta era a causa principal do erro.
                 papel_pagador: novoParticipantePapel,
                 mes_referencia: mesAno, 
                 tipo_registro: 'Mensalidade', 
@@ -274,7 +265,6 @@ const AdminFinanceiroPage: React.FC = () => {
     }
   };
 
-  // Função para marcar/desmarcar pagamento
   const handleTogglePagamento = async (participante: ParticipanteFinanceiro) => {
     setLoading(true); 
     setError(null);
@@ -297,7 +287,6 @@ const AdminFinanceiroPage: React.FC = () => {
       }
 
       if (participante.statusMesAtual === 'Pago' || participante.statusMesAtual === 'Isento') {
-        // Se já está Pago/Isento, vamos marcar como Pendente
         if (participante.idPagamento) { 
             const { error: updateError } = await supabase 
                 .from('pagamentos')
@@ -316,12 +305,10 @@ const AdminFinanceiroPage: React.FC = () => {
         }
 
       } else {
-        // Se está Pendente, vamos marcar como Pago ou Isento
         const statusDesejado: 'Pago' | 'Isento' = participante.papel === 'Goleiro' ? 'Isento' : 'Pago';
         const dataEfetivacao = new Date().toISOString();
 
         if (participante.idPagamento) {
-            // Atualiza um registro existente se já tiver um ID de pagamento
             const { error: updateError } = await supabase 
                 .from('pagamentos')
                 .update({
@@ -334,12 +321,11 @@ const AdminFinanceiroPage: React.FC = () => {
             if (updateError) throw updateError;
             alert(`Pagamento de ${participante.nome} (${participante.papel}) marcado como ${statusDesejado}!`);
         } else {
-            // Cria um novo registro de pagamento se não existir para o mês
             const { error: insertError } = await supabase 
                 .from('pagamentos')
                 .insert({
                     nome_pagador: participante.nome,
-                    apelido_pagador: participante.apelido,
+                    // REMOVIDO: 'apelido_pagador' da inserção.
                     papel_pagador: participante.papel,
                     mes_referencia: mesAnoFormatado,
                     tipo_registro: tipoRegistroParaStatusDesejado,
@@ -351,7 +337,7 @@ const AdminFinanceiroPage: React.FC = () => {
             alert(`Pagamento de ${participante.nome} (${participante.papel}) registrado como ${statusDesejado}!`);
         }
       }
-      fetchPagamentos(); // Recarrega os dados
+      fetchPagamentos();
     } catch (err: unknown) { 
       console.error("Erro ao atualizar pagamento:", (err as Error).message);
       setError("Erro ao atualizar pagamento: " + (err as Error).message);
@@ -360,7 +346,6 @@ const AdminFinanceiroPage: React.FC = () => {
     }
   };
 
-  // Função para deletar um participante (e todos os seus pagamentos)
   const handleDeleteParticipante = async (nome: string, papel: string) => {
     if (!window.confirm(`Tem certeza que deseja deletar ${nome} (${papel}) e TODOS os seus registros de pagamento? Esta ação é irreversível!`)) {
       return;
@@ -376,7 +361,7 @@ const AdminFinanceiroPage: React.FC = () => {
 
       if (deleteError) throw deleteError;
       alert(`${nome} (${papel}) e seus registros de pagamento foram deletados com sucesso.`);
-      fetchPagamentos(); // Recarrega os dados
+      fetchPagamentos();
     } catch (err: unknown) { 
       console.error("Erro ao deletar participante:", (err as Error).message);
       setError("Erro ao deletar participante: " + (err as Error).message);
@@ -450,7 +435,6 @@ const AdminFinanceiroPage: React.FC = () => {
             id="mesAno"
             className="mt-1 block w-40 border border-gray-300 rounded-md shadow-sm p-2 text-black placeholder-gray-500"
             value={mesAno}
-            // CORREÇÃO: Utilizando a função handleMesAnoChange que já estava definida.
             onChange={handleMesAnoChange}
             placeholder="MM/AAAA"
           />
