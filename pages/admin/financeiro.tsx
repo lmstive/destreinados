@@ -7,10 +7,9 @@ import Head from 'next/head';
 import { supabase } from '../../lib/supabase';
 import Link from 'next/link';
 
-interface Pagamento { 
+interface Pagamento {
   id: string;
   nome_pagador: string;
-  // REMOVIDO: apelido_pagador pois a coluna não existe no banco de dados.
   papel_pagador: 'Mensalista' | 'Convidado' | 'Goleiro';
   mes_referencia: string;
   tipo_registro: 'Mensalidade' | 'Jogo Avulso' | 'Isenção Goleiro';
@@ -23,15 +22,14 @@ interface Pagamento {
 interface ParticipanteFinanceiro {
   nome: string;
   papel: 'Mensalista' | 'Convidado' | 'Goleiro';
-  // REMOVIDO: apelido pois a coluna não existe no banco de dados.
   statusMesAtual: 'Pago' | 'Pendente' | 'Isento';
-  valorRegistrado: number; 
+  valorRegistrado: number;
   tipoRegistro: string;
   idPagamento: string | null;
 }
 
-const valorMensalidade = 50; 
-const valorJogoAvulso = 15;  
+const valorMensalidade = 50;
+const valorJogoAvulso = 15;
 
 const AdminFinanceiroPage: React.FC = () => {
   const { data: session, status } = useSession();
@@ -56,6 +54,10 @@ const AdminFinanceiroPage: React.FC = () => {
   const [novoParticipantePapel, setNovoParticipantePapel] = useState<'Mensalista' | 'Convidado' | 'Goleiro'>('Mensalista');
   const [adicionarParticipanteError, setAdicionarParticipanteError] = useState<string | null>(null);
 
+  const [editingParticipantKey, setEditingParticipantKey] = useState<string | null>(null);
+  const [editedNome, setEditedNome] = useState<string>('');
+  const [editedPapel, setEditedPapel] = useState<'Mensalista' | 'Convidado' | 'Goleiro'>('Mensalista');
+
   useEffect(() => {
     if (status === 'loading') return;
     if (!session) {
@@ -75,7 +77,7 @@ const AdminFinanceiroPage: React.FC = () => {
 
       setPagamentos(pagamentosData || []);
 
-    } catch (err: unknown) { 
+    } catch (err: unknown) {
       console.error("Erro ao carregar pagamentos:", (err as Error).message);
       setError("Erro ao carregar dados de pagamentos: " + (err as Error).message);
     } finally {
@@ -106,7 +108,6 @@ const AdminFinanceiroPage: React.FC = () => {
     const [mes, ano] = mesAno.split('/');
     const mesAnoFormatado = `${mes}/${ano}`;
 
-    // REMOVIDO: 'apelido' da lógica de participantes únicos.
     const uniqueParticipantes = new Map<string, { nome: string; papel: 'Mensalista' | 'Convidado' | 'Goleiro'; }>();
     pagamentos.forEach(p => {
       const key = `${p.nome_pagador}-${p.papel_pagador}`;
@@ -126,7 +127,6 @@ const AdminFinanceiroPage: React.FC = () => {
       goleirosCadastrados: 0,
     };
 
-    // REMOVIDO: 'apelido' da desestruturação.
     uniqueParticipantes.forEach(({ nome, papel }) => {
       const pagamentosDoParticipanteNoMes = pagamentos.filter(p =>
         p.nome_pagador === nome &&
@@ -142,7 +142,6 @@ const AdminFinanceiroPage: React.FC = () => {
       const pagamentoPago = pagamentosDoParticipanteNoMes.find(p => p.status_pagamento === 'Pago');
       const pagamentoIsento = pagamentosDoParticipanteNoMes.find(p => p.status_pagamento === 'Isento');
       const pagamentoPendente = pagamentosDoParticipanteNoMes.find(p => p.status_pagamento === 'Pendente');
-
 
       if (pagamentoPago) {
         statusMesAtual = 'Pago';
@@ -169,10 +168,9 @@ const AdminFinanceiroPage: React.FC = () => {
         }
         if (papel === 'Mensalista') valorRegistrado = valorMensalidade;
         else if (papel === 'Convidado') valorRegistrado = valorJogoAvulso;
-        else if (papel === 'Goleiro') valorRegistrado = 0; 
+        else if (papel === 'Goleiro') valorRegistrado = 0;
       }
 
-      // REMOVIDO: 'apelido' da criação do objeto do participante.
       currentParticipantes.push({
         nome,
         papel,
@@ -198,21 +196,39 @@ const AdminFinanceiroPage: React.FC = () => {
         }
       } else if (papel === 'Goleiro') {
         currentStatusGeral.goleirosCadastrados++;
-        if (statusMesAtual === 'Isento') { 
+        if (statusMesAtual === 'Isento') {
           currentStatusGeral.goleirosIsentos++;
         }
       }
     });
 
-    setParticipantesFinanceiros(currentParticipantes.sort((a, b) => a.nome.localeCompare(b.nome)));
+    // CORREÇÃO: Lógica de ordenação customizada
+    const roleOrder = {
+      'Goleiro': 1,
+      'Mensalista': 2,
+      'Convidado': 3
+    };
+
+    const sortedParticipantes = currentParticipantes.sort((a, b) => {
+      const orderA = roleOrder[a.papel];
+      const orderB = roleOrder[b.papel];
+
+      if (orderA < orderB) return -1;
+      if (orderA > orderB) return 1;
+
+      // Se os papéis são os mesmos, ordena por nome
+      return a.nome.localeCompare(b.nome);
+    });
+
+    setParticipantesFinanceiros(sortedParticipantes);
     setTotalArrecadado(currentTotalArrecadado);
     setStatusGeral(currentStatusGeral);
 
-  }, [pagamentos, mesAno, loading]); 
+  }, [pagamentos, mesAno, loading]);
 
   const handleMesAnoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setMesAno(e.target.value);
-  }, []); 
+  }, []);
 
   const handleAddParticipante = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -225,55 +241,54 @@ const AdminFinanceiroPage: React.FC = () => {
 
     const nomeFormatado = novoParticipanteNome.trim();
 
-    const participanteExistente = participantesFinanceiros.some(p => 
-        p.nome.toLowerCase() === nomeFormatado.toLowerCase() && 
-        p.papel === novoParticipantePapel
+    const participanteExistente = pagamentos.some(p =>
+        p.nome_pagador.toLowerCase() === nomeFormatado.toLowerCase() &&
+        p.papel_pagador === novoParticipantePapel
     );
 
     if (participanteExistente) {
-        setAdicionarParticipanteError(`O participante "${nomeFormatado}" com o papel "${novoParticipantePapel}" já existe na lista.`);
+        setAdicionarParticipanteError(`O participante "${nomeFormatado}" com o papel "${novoParticipantePapel}" já existe.`);
         return;
     }
 
-    setLoading(true); 
+    setLoading(true);
     try {
-        const { error: insertError } = await supabase 
+        const { error: insertError } = await supabase
             .from('pagamentos')
             .insert({
                 nome_pagador: nomeFormatado,
-                // REMOVIDO: 'apelido_pagador' da inserção. Esta era a causa principal do erro.
                 papel_pagador: novoParticipantePapel,
-                mes_referencia: mesAno, 
-                tipo_registro: 'Mensalidade', 
-                valor_registrado: 0, 
-                status_pagamento: 'Pendente', 
+                mes_referencia: mesAno,
+                tipo_registro: 'Mensalidade',
+                valor_registrado: 0,
+                status_pagamento: 'Pendente',
                 data_efetivacao: null,
             });
 
         if (insertError) throw insertError;
 
-        setNovoParticipanteNome(''); 
-        setNovoParticipantePapel('Mensalista'); 
-        fetchPagamentos(); 
+        setNovoParticipanteNome('');
+        setNovoParticipantePapel('Mensalista');
+        fetchPagamentos();
         alert('Participante adicionado com sucesso e marcado como Pendente para o mês atual!');
 
-    } catch (err: unknown) { 
+    } catch (err: unknown) {
         console.error("Erro ao adicionar participante:", (err as Error).message);
         setAdicionarParticipanteError("Erro ao adicionar participante: " + (err as Error).message);
     } finally {
-        setLoading(false); 
+        setLoading(false);
     }
   };
 
   const handleTogglePagamento = async (participante: ParticipanteFinanceiro) => {
-    setLoading(true); 
+    setLoading(true);
     setError(null);
     try {
       const [mes, ano] = mesAno.split('/');
       const mesAnoFormatado = `${mes}/${ano}`;
 
       let valorParaStatusDesejado = 0;
-      let tipoRegistroParaStatusDesejado: Pagamento['tipo_registro'] = 'Mensalidade'; 
+      let tipoRegistroParaStatusDesejado: Pagamento['tipo_registro'] = 'Mensalidade';
 
       if (participante.papel === 'Goleiro') {
         valorParaStatusDesejado = 0;
@@ -281,22 +296,22 @@ const AdminFinanceiroPage: React.FC = () => {
       } else if (participante.papel === 'Mensalista') {
         valorParaStatusDesejado = valorMensalidade;
         tipoRegistroParaStatusDesejado = 'Mensalidade';
-      } else { // 'Convidado'
+      } else {
         valorParaStatusDesejado = valorJogoAvulso;
         tipoRegistroParaStatusDesejado = 'Jogo Avulso';
       }
 
       if (participante.statusMesAtual === 'Pago' || participante.statusMesAtual === 'Isento') {
-        if (participante.idPagamento) { 
-            const { error: updateError } = await supabase 
+        if (participante.idPagamento) {
+            const { error: updateError } = await supabase
                 .from('pagamentos')
-                .update({ 
-                    status_pagamento: 'Pendente', 
-                    valor_registrado: 0, 
-                    tipo_registro: tipoRegistroParaStatusDesejado, 
-                    data_efetivacao: null 
+                .update({
+                    status_pagamento: 'Pendente',
+                    valor_registrado: 0,
+                    tipo_registro: tipoRegistroParaStatusDesejado,
+                    data_efetivacao: null
                 })
-                .eq('id', participante.idPagamento); 
+                .eq('id', participante.idPagamento);
 
             if (updateError) throw updateError;
             alert(`Pagamento de ${participante.nome} (${participante.papel}) desmarcado.`);
@@ -309,7 +324,7 @@ const AdminFinanceiroPage: React.FC = () => {
         const dataEfetivacao = new Date().toISOString();
 
         if (participante.idPagamento) {
-            const { error: updateError } = await supabase 
+            const { error: updateError } = await supabase
                 .from('pagamentos')
                 .update({
                     status_pagamento: statusDesejado,
@@ -321,11 +336,10 @@ const AdminFinanceiroPage: React.FC = () => {
             if (updateError) throw updateError;
             alert(`Pagamento de ${participante.nome} (${participante.papel}) marcado como ${statusDesejado}!`);
         } else {
-            const { error: insertError } = await supabase 
+            const { error: insertError } = await supabase
                 .from('pagamentos')
                 .insert({
                     nome_pagador: participante.nome,
-                    // REMOVIDO: 'apelido_pagador' da inserção.
                     papel_pagador: participante.papel,
                     mes_referencia: mesAnoFormatado,
                     tipo_registro: tipoRegistroParaStatusDesejado,
@@ -338,11 +352,11 @@ const AdminFinanceiroPage: React.FC = () => {
         }
       }
       fetchPagamentos();
-    } catch (err: unknown) { 
+    } catch (err: unknown) {
       console.error("Erro ao atualizar pagamento:", (err as Error).message);
       setError("Erro ao atualizar pagamento: " + (err as Error).message);
     } finally {
-      setLoading(false); 
+      setLoading(false);
     }
   };
 
@@ -350,34 +364,81 @@ const AdminFinanceiroPage: React.FC = () => {
     if (!window.confirm(`Tem certeza que deseja deletar ${nome} (${papel}) e TODOS os seus registros de pagamento? Esta ação é irreversível!`)) {
       return;
     }
-    setLoading(true); 
+    setLoading(true);
     setError(null);
     try {
-      const { error: deleteError } = await supabase 
+      const { error: deleteError } = await supabase
         .from('pagamentos')
         .delete()
         .eq('nome_pagador', nome)
-        .eq('papel_pagador', papel); 
+        .eq('papel_pagador', papel);
 
       if (deleteError) throw deleteError;
       alert(`${nome} (${papel}) e seus registros de pagamento foram deletados com sucesso.`);
       fetchPagamentos();
-    } catch (err: unknown) { 
+    } catch (err: unknown) {
       console.error("Erro ao deletar participante:", (err as Error).message);
       setError("Erro ao deletar participante: " + (err as Error).message);
     } finally {
-      setLoading(false); 
+      setLoading(false);
     }
   };
 
-  if (status === 'loading' || !session) { 
+  const handleEditClick = (participante: ParticipanteFinanceiro) => {
+    const key = `${participante.nome}-${participante.papel}`;
+    setEditingParticipantKey(key);
+    setEditedNome(participante.nome);
+    setEditedPapel(participante.papel);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingParticipantKey(null);
+    setEditedNome('');
+    setEditedPapel('Mensalista');
+  };
+
+  const handleUpdateParticipant = async (originalNome: string, originalPapel: string) => {
+    if (!editedNome.trim()) {
+      setError("O nome não pode ser vazio.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: updateError } = await supabase
+        .from('pagamentos')
+        .update({ nome_pagador: editedNome.trim(), papel_pagador: editedPapel })
+        .eq('nome_pagador', originalNome)
+        .eq('papel_pagador', originalPapel);
+
+      if (updateError) throw updateError;
+
+      alert('Participante atualizado com sucesso!');
+      handleCancelEdit();
+      fetchPagamentos();
+
+    } catch (err: unknown) {
+      console.error("Erro ao atualizar participante:", (err as Error).message);
+      setError("Erro ao atualizar participante: " + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (status === 'loading' || !session) {
     return <Layout><p className="p-8 text-center text-gray-700">Verificando permissão e carregando Controle Financeiro...</p></Layout>;
   }
 
   if (!session) {
     router.push('/');
-    return null; 
+    return null;
   }
+
+  const roleClasses = {
+    Mensalista: 'bg-blue-100 text-blue-800',
+    Convidado: 'bg-purple-100 text-purple-800',
+    Goleiro: 'bg-gray-100 text-gray-800',
+  };
 
   return (
     <Layout>
@@ -389,7 +450,7 @@ const AdminFinanceiroPage: React.FC = () => {
       {error && <p className="text-red-500 mb-4 p-2 bg-red-100 rounded">{error}</p>}
 
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Adicionar Novo Participante Financeiro</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Adicionar Novo Participante</h2>
         <form onSubmit={handleAddParticipante} className="space-y-4">
           <div>
             <label htmlFor="novoParticipanteNome" className="block text-sm font-medium text-black">Nome do Participante</label>
@@ -440,83 +501,130 @@ const AdminFinanceiroPage: React.FC = () => {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="bg-blue-50 p-4 rounded-lg">
             <h3 className="text-lg font-semibold text-blue-800">Total Arrecadado ({mesAno}):</h3>
             <p className="text-3xl font-bold text-blue-600">
               {totalArrecadado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </p>
           </div>
+          <div className="bg-green-50 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-green-800">Mensalistas ({mesAno}):</h3>
+            <p className="text-black">{statusGeral.mensalistasPagos} de {statusGeral.mensalistasCadastrados} pagos</p>
+          </div>
           <div className="bg-yellow-50 p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-yellow-800">Status Geral ({mesAno}):</h3>
-            <p className="text-black">Mensalistas Pagos: {statusGeral.mensalistasPagos} de {statusGeral.mensalistasCadastrados} cadastrados</p>
-            <p className="text-black">Convidados Pagos: {statusGeral.convidadosPagos} de {statusGeral.convidadosCadastrados} cadastrados</p>
-            <p className="text-black">Goleiros Isentos: {statusGeral.goleirosIsentos} de {statusGeral.goleirosCadastrados} cadastrados</p>
+            <h3 className="text-lg font-semibold text-yellow-800">Convidados ({mesAno}):</h3>
+            <p className="text-black">{statusGeral.convidadosPagos} de {statusGeral.convidadosCadastrados} pagos</p>
           </div>
         </div>
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status de Pagamento por Participante</h2>
-        {!loading && participantesFinanceiros.length === 0 ? ( 
-          <p className="text-gray-600">Nenhum participante financeiro cadastrado ou encontrado para este mês. Use o formulário acima para adicionar.</p>
+        {!loading && participantesFinanceiros.length === 0 ? (
+          <p className="text-gray-600">Nenhum participante financeiro cadastrado ou encontrado para este mês.</p>
         ) : (
-            !loading && ( 
-                <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white">
-                    <thead>
-                        <tr>
-                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">NOME DO PARTICIPANTE</th>
-                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">PAPEL</th>
-                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">STATUS ({mesAno})</th>
-                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">VALOR REGISTRADO</th>
-                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">TIPO REG.</th>
-                        <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">AÇÃO</th>
+            <div className="overflow-x-auto">
+                <table className="min-w-full bg-white">
+                <thead>
+                    <tr>
+                    <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">NOME DO PARTICIPANTE</th>
+                    <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">PAPEL</th>
+                    <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">STATUS ({mesAno})</th>
+                    <th className="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-black">AÇÕES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {participantesFinanceiros.map((participante) => {
+                      const key = `${participante.nome}-${participante.papel}`;
+                      const isEditing = editingParticipantKey === key;
+
+                      return isEditing ? (
+                        <tr key={key} className="bg-yellow-50">
+                          <td className="py-3 px-4 border-b border-gray-200">
+                            <input
+                              type="text"
+                              value={editedNome}
+                              onChange={(e) => setEditedNome(e.target.value)}
+                              className="w-full p-1 border border-gray-300 rounded-md"
+                              style={{ color: 'black' }}
+                            />
+                          </td>
+                          <td className="py-3 px-4 border-b border-gray-200">
+                            <select
+                              value={editedPapel}
+                              onChange={(e) => setEditedPapel(e.target.value as any)}
+                              className="w-full p-1 border border-gray-300 rounded-md"
+                              style={{ color: 'black' }}
+                            >
+                                <option value="Mensalista">Mensalista</option>
+                                <option value="Convidado">Convidado</option>
+                                <option value="Goleiro">Goleiro</option>
+                            </select>
+                          </td>
+                          <td className="py-3 px-4 border-b border-gray-200 text-sm text-gray-400 italic">
+                              Editando...
+                          </td>
+                          <td className="py-3 px-4 border-b border-gray-200 text-sm">
+                            <button
+                              onClick={() => handleUpdateParticipant(participante.nome, participante.papel)}
+                              className="bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded-md text-sm font-medium mr-2"
+                              disabled={loading}
+                            >
+                              Salvar
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="bg-gray-500 hover:bg-gray-600 text-white py-1 px-3 rounded-md text-sm font-medium"
+                              disabled={loading}
+                            >
+                              Cancelar
+                            </button>
+                          </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {participantesFinanceiros.map((participante, index) => (
-                        <tr key={`${participante.nome}-${participante.papel}-${index}`} className="hover:bg-gray-50">
+                      ) : (
+                        <tr key={key} className="hover:bg-gray-50">
                             <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.nome}</td>
-                            <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.papel}</td>
                             <td className="py-3 px-4 border-b border-gray-200 text-sm">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${roleClasses[participante.papel]}`}>
+                                {participante.papel}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 border-b border-gray-200 text-sm">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-semibold cursor-pointer ${
                                 participante.statusMesAtual === 'Pago' ? 'bg-green-100 text-green-800' :
                                 participante.statusMesAtual === 'Pendente' ? 'bg-red-100 text-red-800' :
                                 'bg-blue-100 text-blue-800'
-                            }`}>
-                                {participante.statusMesAtual}
-                            </span>
-                            </td>
-                            <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">
-                            {participante.valorRegistrado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </td>
-                            <td className="py-3 px-4 border-b border-gray-200 text-sm text-black">{participante.tipoRegistro || '-'}</td>
-                            <td className="py-3 px-4 border-b border-gray-200 text-sm">
-                            <button
-                                onClick={() => handleTogglePagamento(participante)}
-                                className={`py-1 px-3 rounded-md text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-opacity-50 mr-2 ${
-                                participante.statusMesAtual === 'Pago' ? 'bg-orange-500 hover:bg-orange-600 focus:ring-orange-400' :
-                                'bg-blue-500 hover:bg-blue-600 focus:ring-blue-400'
                                 }`}
+                                onClick={() => handleTogglePagamento(participante)}
+                                title={`Clique para alterar o status. Valor: ${participante.valorRegistrado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+                              >
+                                {participante.statusMesAtual}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 border-b border-gray-200 text-sm">
+                              <button
+                                onClick={() => handleEditClick(participante)}
+                                className="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-3 rounded-md text-sm font-medium mr-2"
                                 disabled={loading}
-                            >
-                                {participante.statusMesAtual === 'Pago' ? 'Desmarcar Pago' : 'Marcar como Pago'}
-                            </button>
-                            <button
-                                onClick={() => handleDeleteParticipante(participante.nome, participante.papel)}
-                                className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50"
-                                disabled={loading}
-                            >
-                                Excluir
-                            </button>
+                              >
+                                Editar
+                              </button>
+                              <button
+                                  onClick={() => handleDeleteParticipante(participante.nome, participante.papel)}
+                                  className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded-md text-sm font-medium"
+                                  disabled={loading}
+                              >
+                                  Excluir
+                              </button>
                             </td>
                         </tr>
-                        ))}
-                    </tbody>
-                    </table>
-                </div>
-            )
+                      )
+                    })}
+                </tbody>
+                </table>
+            </div>
         )}
       </div>
 
