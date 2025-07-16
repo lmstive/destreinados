@@ -1,9 +1,11 @@
 // pages/index.tsx
+
 import Layout from '../components/Layout';
 import Head from 'next/head';
 import Link from 'next/link';
 import { CalendarDaysIcon, ClockIcon, MapPinIcon, CakeIcon } from '@heroicons/react/24/solid';
 import { supabase } from '../lib/supabase'; // Importe o cliente Supabase
+import Estatuto from '../components/Estatuto'; // <-- 1. IMPORTAÇÃO ADICIONADA
 
 // Interface para o tipo de jogador (precisa ser a mesma do jogadores.tsx)
 interface Jogador {
@@ -120,6 +122,10 @@ const HomePage: React.FC<HomePageProps> = ({ jogadores }) => {
           </Link>
         </div>
       </section>
+
+      {/* <-- 2. COMPONENTE DO ESTATUTO ADICIONADO AQUI --> */}
+      <Estatuto />
+
     </Layout>
   );
 };
