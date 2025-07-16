@@ -49,7 +49,7 @@ Resposta da Diretoria:(Marque com um X ou mande um áudio)
     campos: [
       { id: 'solicitante_nome', label: 'Seu Nome:', placeholder: 'Fulano de Tal', type: 'text', default: '' },
       { id: 'data_do_jogo', label: 'Data do Jogo:', placeholder: 'DD/MM/AAAA', type: 'date', default: '' },
-      { id: 'horario_inicial', label: 'Horário Inicial:', placeholder: 'HH:MM', type: 'time', default: '20:00' },
+      { id: 'horario_inicial', label: 'Horário Inicial:', placeholder: 'HH:MM', type: 'time', default: '22:00' },
       { id: 'horario_final', label: 'Horário Final:', placeholder: 'HH:MM', type: 'time', default: '23:00' },
     ],
     opcoesTrocaJusta: [
