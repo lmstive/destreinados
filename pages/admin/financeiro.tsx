@@ -4,43 +4,21 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import Head from 'next/head';
-import { createClient, SupabaseClient } from '@supabase/supabase-js'; // Importado SupabaseClient para tipagem
-import { CheckCircleIcon, ClockIcon as PendenteIcon } from '@heroicons/react/24/outline'; // Ícones de status
+import { supabase } from '../../lib/supabase'; // Importa 'supabase' do arquivo lib/supabase.ts
+// CORRIGIDO: Removido XCircleIcon pois não é usado diretamente aqui
+// CORRIGIDO: CheckCircleIcon e PendenteIcon são agora usados diretamente nos spans
+import { CheckCircleIcon, ClockIcon as PendenteIcon } from '@heroicons/react/24/solid'; // Alterado para /24/solid para ícones preenchidos
 import Link from 'next/link';
 
-// Inicializa o Supabase Client
-// Certifique-se de que NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY estão em .env.local
-const supabaseUrl: string = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey: string = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-// Verifica se as variáveis de ambiente estão definidas antes de criar o cliente
-let supabase: SupabaseClient;
-try {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
-  }
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-} catch (err) {
-  console.error("Failed to initialize Supabase client:", err);
-  // Fallback para um cliente Supabase "dummy" ou tratamento de erro adequado
-  // Isso é para evitar que a aplicação quebre durante a compilação/execução se as variáveis não estiverem lá
-  supabase = {} as SupabaseClient; // Apenas para tipagem, não funcional
-}
-
-
 // Interfaces para os tipos de dados
-interface Jogador { // Usada para jogadores cadastrados na tabela jogadores
-  id: string;
-  nome: string;
-  apelido: string | null;
-  papel: string; // 'Mensalista', 'Convidado', 'Goleiro'
-}
+// CORRIGIDO: Removida interface Jogador, pois não é usada diretamente aqui
+// interface Jogador { /* ... */ } 
 
-interface Pagamento { // Usada para registros na tabela pagamentos
+interface Pagamento { 
   id: string;
   nome_pagador: string;
   apelido_pagador: string | null;
-  papel_pagador: string;
+  papel_pagador: 'Mensalista' | 'Convidado' | 'Goleiro';
   mes_referencia: string;
   tipo_registro: 'Mensalidade' | 'Jogo Avulso' | 'Isenção Goleiro';
   valor_registrado: number;
@@ -49,28 +27,27 @@ interface Pagamento { // Usada para registros na tabela pagamentos
   created_at: string;
 }
 
-// Interface para o participante financeiro (combinação de dados para exibição)
 interface ParticipanteFinanceiro {
   nome: string;
-  papel: string;
-  apelido: string | null; // Adicionado apelido para exibição
+  papel: 'Mensalista' | 'Convidado' | 'Goleiro';
+  apelido: string | null;
   statusMesAtual: 'Pago' | 'Pendente' | 'Isento';
-  valorRegistrado: number;
+  valorRegistrado: number; // Valor que deve ser pago ou foi registrado
   tipoRegistro: string;
-  idPagamento: string | null; // ID do registro de pagamento se existir
+  idPagamento: string | null;
 }
 
-// Defina os valores padrão para mensalidade e jogo avulso
-const valorMensalidade = 50; // Altere conforme necessário
-const valorJogoAvulso = 15;  // Altere conforme necessário
+// Valores fixos de pagamento (declarados fora do componente)
+const valorMensalidade = 50; 
+const valorJogoAvulso = 15;  
 
 const AdminFinanceiroPage: React.FC = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
 
   const [mesAno, setMesAno] = useState<string>(new Date().toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }).replace('/', '/'));
-  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
-  const [participantesFinanceiros, setParticipantesFinanceiros] = useState<ParticipanteFinanceiro[]>([]);
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]); // Pagamentos brutos da DB
+  const [participantesFinanceiros, setParticipantesFinanceiros] = useState<ParticipanteFinanceiro[]>([]); // Lista processada para exibição
   const [totalArrecadado, setTotalArrecadado] = useState<number>(0);
   const [statusGeral, setStatusGeral] = useState({
     mensalistasPagos: 0,
@@ -83,7 +60,6 @@ const AdminFinanceiroPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Estados para o formulário de adicionar novo participante
   const [novoParticipanteNome, setNovoParticipanteNome] = useState<string>('');
   const [novoParticipantePapel, setNovoParticipantePapel] = useState<'Mensalista' | 'Convidado' | 'Goleiro'>('Mensalista');
   const [adicionarParticipanteError, setAdicionarParticipanteError] = useState<string | null>(null);
@@ -95,37 +71,39 @@ const AdminFinanceiroPage: React.FC = () => {
     }
   }, [session, status, router]);
 
-  // --- Função principal para buscar dados ---
-  // CORRIGIDO: Removido 'async (err: any)' e tipado o catch
+  // Função principal para buscar todos os registros de pagamentos
   const fetchPagamentos = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Busca todos os registros da tabela pagamentos
-      const { data, error } = await supabase
+      // CORRIGIDO: Usado 'pagamentosData' e 'fetchError' para evitar variáveis 'data' e 'error' não usadas
+      const { data: pagamentosData, error: fetchError } = await supabase
         .from('pagamentos')
         .select('*');
 
-      if (error) throw error; // Lança o erro para ser pego pelo catch
+      if (fetchError) throw fetchError;
 
-      setPagamentos(data || []);
-      console.log("Dados brutos de pagamentos carregados:", data); // Para depuração
+      setPagamentos(pagamentosData || []);
+      console.log("Dados brutos de pagamentos carregados:", pagamentosData);
 
-    } catch (err: any) { // Tipagem explícita para o erro no catch
-      console.error("Erro ao carregar pagamentos:", err.message);
-      setError("Erro ao carregar dados de pagamentos: " + err.message);
+    } catch (err: unknown) { // CORRIGIDO: Tipado o catch como 'unknown' e feito o cast para Error
+      console.error("Erro ao carregar pagamentos:", (err as Error).message);
+      setError("Erro ao carregar dados de pagamentos: " + (err as Error).message);
     } finally {
       setLoading(false);
     }
-  }, []); // fetchPagamentos não depende de mesAno aqui, ele pega todos os pagamentos para processar depois
+  }, []); // Sem dependências para ser estável para o useEffect
 
+  // Carrega todos os pagamentos na montagem inicial
   useEffect(() => {
     fetchPagamentos();
-  }, [fetchPagamentos]); // Agora fetchPagamentos está no array de dependências do useEffect
+  }, [fetchPagamentos]);
 
   // Lógica para processar os pagamentos e gerar a lista de participantes
   useEffect(() => {
-    if (pagamentos.length === 0 && !loading) {
+    // CORRIGIDO: Ajustado a condição de retorno para evitar processamento desnecessário
+    if (loading && pagamentos.length === 0) return;
+    if (!pagamentos.length && !loading) {
         setParticipantesFinanceiros([]);
         setTotalArrecadado(0);
         setStatusGeral({
@@ -142,12 +120,11 @@ const AdminFinanceiroPage: React.FC = () => {
     const [mes, ano] = mesAno.split('/');
     const mesAnoFormatado = `${mes}/${ano}`;
 
-    // 1. Coletar todos os participantes únicos da tabela 'pagamentos'
-    const uniqueParticipantes = new Map<string, { nome: string; papel: string; apelido: string | null }>(); // Adicionado apelido
+    const uniqueParticipantes = new Map<string, { nome: string; papel: 'Mensalista' | 'Convidado' | 'Goleiro'; apelido: string | null }>();
     pagamentos.forEach(p => {
       const key = `${p.nome_pagador}-${p.papel_pagador}`;
       if (!uniqueParticipantes.has(key)) {
-        uniqueParticipantes.set(key, { nome: p.nome_pagador, papel: p.papel_pagador, apelido: p.apelido_pagador }); // Pega o apelido
+        uniqueParticipantes.set(key, { nome: p.nome_pagador, papel: p.papel_pagador, apelido: p.apelido_pagador });
       }
     });
 
@@ -162,8 +139,7 @@ const AdminFinanceiroPage: React.FC = () => {
       goleirosCadastrados: 0,
     };
 
-    uniqueParticipantes.forEach(({ nome, papel, apelido }) => { // Pega apelido aqui também
-      // Encontrar o status mais relevante para o mês/ano atual para este participante
+    uniqueParticipantes.forEach(({ nome, papel, apelido }) => {
       const pagamentosDoParticipanteNoMes = pagamentos.filter(p =>
         p.nome_pagador === nome &&
         p.papel_pagador === papel &&
@@ -172,10 +148,9 @@ const AdminFinanceiroPage: React.FC = () => {
 
       let statusMesAtual: 'Pago' | 'Pendente' | 'Isento' = 'Pendente';
       let valorRegistrado = 0;
-      let tipoRegistro = '';
+      let tipoRegistro: string = '';
       let idPagamento: string | null = null;
 
-      // Prioridade: Pago > Isento > Pendente
       const pagamentoPago = pagamentosDoParticipanteNoMes.find(p => p.status_pagamento === 'Pago');
       const pagamentoIsento = pagamentosDoParticipanteNoMes.find(p => p.status_pagamento === 'Isento');
       const pagamentoPendente = pagamentosDoParticipanteNoMes.find(p => p.status_pagamento === 'Pendente');
@@ -197,33 +172,34 @@ const AdminFinanceiroPage: React.FC = () => {
         tipoRegistro = pagamentoPendente.tipo_registro;
         idPagamento = pagamentoPendente.id;
       }
-
-      // Se não encontrou nenhum registro para o mês atual, mas o participante existe, ele é Pendente.
-      // E se for um Goleiro, ele é Isento por padrão para o mês, a menos que tenha um registro de pagamento.
+      
       if (!pagamentoPago && !pagamentoIsento && !pagamentoPendente) {
         if (papel === 'Goleiro') {
           statusMesAtual = 'Isento';
         } else {
           statusMesAtual = 'Pendente';
         }
+        // Definir valor inicial para participantes sem registro no mês atual
+        if (papel === 'Mensalista') valorRegistrado = valorMensalidade;
+        else if (papel === 'Convidado') valorRegistrado = valorJogoAvulso;
+        else if (papel === 'Goleiro') valorRegistrado = 0; 
       }
+
 
       currentParticipantes.push({
         nome,
         papel,
-        apelido, // Incluído apelido aqui
+        apelido, 
         statusMesAtual,
         valorRegistrado,
         tipoRegistro,
         idPagamento,
       });
 
-      // Calcular total arrecadado apenas para pagamentos "Pago"
       if (statusMesAtual === 'Pago') {
         currentTotalArrecadado += valorRegistrado;
       }
 
-      // Atualizar status geral
       if (papel === 'Mensalista') {
         currentStatusGeral.mensalistasCadastrados++;
         if (statusMesAtual === 'Pago') {
@@ -236,26 +212,24 @@ const AdminFinanceiroPage: React.FC = () => {
         }
       } else if (papel === 'Goleiro') {
         currentStatusGeral.goleirosCadastrados++;
-        if (statusMesAtual === 'Isento') { // Apenas conta como isento se o status for realmente 'Isento' para o mês
+        if (statusMesAtual === 'Isento') { 
           currentStatusGeral.goleirosIsentos++;
         }
       }
     });
 
-    // CORRIGIDO: Adicionado sort para garantir ordem alfabética
     setParticipantesFinanceiros(currentParticipantes.sort((a, b) => a.nome.localeCompare(b.nome)));
     setTotalArrecadado(currentTotalArrecadado);
     setStatusGeral(currentStatusGeral);
-    console.log("Participantes processados:", currentParticipantes); // Para depuração
-    console.log("Status Geral:", currentStatusGeral); // Para depuração
+    console.log("Participantes processados:", currentParticipantes); 
+    console.log("Status Geral:", currentStatusGeral); 
 
-  }, [pagamentos, mesAno, loading]); // Depende de pagamentos e mesAno
-
+  }, [pagamentos, mesAno, loading, valorMensalidade, valorJogoAvulso]); 
 
   // Lidar com a mudança do mês/ano
-  const handleMesAnoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMesAnoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setMesAno(e.target.value);
-  };
+  }, []); 
 
   // Função para adicionar um novo participante financeiro
   const handleAddParticipante = async (e: React.FormEvent) => {
@@ -267,60 +241,58 @@ const AdminFinanceiroPage: React.FC = () => {
       return;
     }
 
-    // Verifica se o participante já existe (pelo nome e papel)
+    const nomeFormatado = novoParticipanteNome.trim();
+
     const participanteExistente = participantesFinanceiros.some(p => 
-        p.nome.toLowerCase() === novoParticipanteNome.trim().toLowerCase() && 
+        p.nome.toLowerCase() === nomeFormatado.toLowerCase() && 
         p.papel === novoParticipantePapel
     );
 
     if (participanteExistente) {
-        setAdicionarParticipanteError(`O participante "${novoParticipanteNome}" com o papel "${novoParticipantePapel}" já existe na lista.`);
+        setAdicionarParticipanteError(`O participante "${nomeFormatado}" com o papel "${novoParticipantePapel}" já existe na lista.`);
         return;
     }
 
-    setLoading(true);
+    setLoading(true); 
     try {
-        // Insere um registro inicial "Pendente" para o novo participante
-        // Use o nome e o papel do novo participante para o registro
-        const { error } = await supabase
+        const { error: insertError } = await supabase 
             .from('pagamentos')
             .insert({
-                nome_pagador: novoParticipanteNome.trim(),
-                apelido_pagador: '', // Apelido inicial vazio
+                nome_pagador: nomeFormatado,
+                apelido_pagador: null, 
                 papel_pagador: novoParticipantePapel,
-                mes_referencia: mesAno, // Mês atual como referência inicial
-                tipo_registro: 'Mensalidade', // Tipo padrão
-                valor_registrado: 0, // Valor inicial 0
-                status_pagamento: 'Pendente', // Status inicial Pendente
+                mes_referencia: mesAno, 
+                tipo_registro: 'Mensalidade', 
+                valor_registrado: 0, 
+                status_pagamento: 'Pendente', 
                 data_efetivacao: null,
             });
 
-        if (error) throw error;
+        if (insertError) throw insertError;
 
-        setNovoParticipanteNome(''); // Limpa o campo
-        setNovoParticipantePapel('Mensalista'); // Reseta para o padrão
-        fetchPagamentos(); // Recarrega os dados para atualizar a lista
+        setNovoParticipanteNome(''); 
+        setNovoParticipantePapel('Mensalista'); 
+        fetchPagamentos(); 
         alert('Participante adicionado com sucesso e marcado como Pendente para o mês atual!');
 
-    } catch (err: any) {
-        console.error("Erro ao adicionar participante:", err.message);
-        setAdicionarParticipanteError("Erro ao adicionar participante: " + err.message);
+    } catch (err: unknown) { 
+        console.error("Erro ao adicionar participante:", (err as Error).message);
+        setAdicionarParticipanteError("Erro ao adicionar participante: " + (err as Error).message);
     } finally {
-        setLoading(false);
+        setLoading(false); 
     }
   };
 
   // Função para marcar/desmarcar pagamento
   const handleTogglePagamento = async (participante: ParticipanteFinanceiro) => {
-    setLoading(true);
+    setLoading(true); 
     setError(null);
     try {
       const [mes, ano] = mesAno.split('/');
       const mesAnoFormatado = `${mes}/${ano}`;
 
-      // Valor e tipo de registro para o novo status
       let valorParaStatusDesejado = 0;
-      let tipoRegistroParaStatusDesejado: Pagamento['tipo_registro'] = 'Mensalidade'; // Default
+      let tipoRegistroParaStatusDesejado: Pagamento['tipo_registro'] = 'Mensalidade'; 
 
       if (participante.papel === 'Goleiro') {
         valorParaStatusDesejado = 0;
@@ -335,18 +307,22 @@ const AdminFinanceiroPage: React.FC = () => {
 
       if (participante.statusMesAtual === 'Pago' || participante.statusMesAtual === 'Isento') {
         // Se já está Pago/Isento, vamos marcar como Pendente
-        const { error } = await supabase
-            .from('pagamentos')
-            .update({ 
-                status_pagamento: 'Pendente', 
-                valor_registrado: 0, 
-                tipo_registro: tipoRegistroParaStatusDesejado, // Mantém o tipo original ou ajusta
-                data_efetivacao: null 
-            })
-            .eq('id', participante.idPagamento); // Usa o ID do registro de pagamento
+        if (participante.idPagamento) { 
+            const { error: updateError } = await supabase 
+                .from('pagamentos')
+                .update({ 
+                    status_pagamento: 'Pendente', 
+                    valor_registrado: 0, 
+                    tipo_registro: tipoRegistroParaStatusDesejado, 
+                    data_efetivacao: null 
+                })
+                .eq('id', participante.idPagamento); 
 
-        if (error) throw error;
-        alert(`Pagamento de ${participante.nome} (${participante.papel}) desmarcado.`);
+            if (updateError) throw updateError;
+            alert(`Pagamento de ${participante.nome} (${participante.papel}) desmarcado.`);
+        } else {
+            setError('Erro interno: Registro de pagamento não encontrado para desmarcar.');
+        }
 
       } else {
         // Se está Pendente, vamos marcar como Pago ou Isento
@@ -355,7 +331,7 @@ const AdminFinanceiroPage: React.FC = () => {
 
         if (participante.idPagamento) {
             // Atualiza um registro existente se já tiver um ID de pagamento
-            const { error } = await supabase
+            const { error: updateError } = await supabase 
                 .from('pagamentos')
                 .update({
                     status_pagamento: statusDesejado,
@@ -364,11 +340,11 @@ const AdminFinanceiroPage: React.FC = () => {
                     data_efetivacao: dataEfetivacao,
                 })
                 .eq('id', participante.idPagamento);
-            if (error) throw error;
+            if (updateError) throw updateError;
             alert(`Pagamento de ${participante.nome} (${participante.papel}) marcado como ${statusDesejado}!`);
         } else {
             // Cria um novo registro de pagamento se não existir para o mês
-            const { error } = await supabase
+            const { error: insertError } = await supabase 
                 .from('pagamentos')
                 .insert({
                     nome_pagador: participante.nome,
@@ -380,16 +356,16 @@ const AdminFinanceiroPage: React.FC = () => {
                     status_pagamento: statusDesejado,
                     data_efetivacao: dataEfetivacao,
                 });
-            if (error) throw error;
+            if (insertError) throw insertError;
             alert(`Pagamento de ${participante.nome} (${participante.papel}) registrado como ${statusDesejado}!`);
         }
       }
       fetchPagamentos(); // Recarrega os dados
-    } catch (err: any) {
-      console.error("Erro ao atualizar pagamento:", err.message);
-      setError("Erro ao atualizar pagamento: " + err.message);
+    } catch (err: unknown) { 
+      console.error("Erro ao atualizar pagamento:", (err as Error).message);
+      setError("Erro ao atualizar pagamento: " + (err as Error).message);
     } finally {
-      setLoading(false);
+      setLoading(false); 
     }
   };
 
@@ -398,29 +374,35 @@ const AdminFinanceiroPage: React.FC = () => {
     if (!window.confirm(`Tem certeza que deseja deletar ${nome} (${papel}) e TODOS os seus registros de pagamento? Esta ação é irreversível!`)) {
       return;
     }
-    setLoading(true);
+    setLoading(true); 
     setError(null);
     try {
-      const { error } = await supabase
+      const { error: deleteError } = await supabase 
         .from('pagamentos')
         .delete()
         .eq('nome_pagador', nome)
-        .eq('papel_pagador', papel); // Deleta todos os registros para este nome e papel
+        .eq('papel_pagador', papel); 
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
       alert(`${nome} (${papel}) e seus registros de pagamento foram deletados com sucesso.`);
       fetchPagamentos(); // Recarrega os dados
-    } catch (err: any) {
-      console.error("Erro ao deletar participante:", err.message);
-      setError("Erro ao deletar participante: " + err.message);
+    } catch (err: unknown) { 
+      console.error("Erro ao deletar participante:", (err as Error).message);
+      setError("Erro ao deletar participante: " + (err as Error).message);
     } finally {
-      setLoading(false);
+      setLoading(false); 
     }
   };
 
   // Mostra mensagem de carregamento enquanto a sessão é verificada ou dados são carregados
-  if (status === 'loading' || !session || loading) {
-    return <Layout><p>Carregando Controle Financeiro...</p></Layout>;
+  if (status === 'loading' || !session) { 
+    return <Layout><p className="p-8 text-center text-gray-700">Verificando permissão e carregando Controle Financeiro...</p></Layout>;
+  }
+  
+  // Se não estiver autenticado após carregar, redireciona
+  if (!session) {
+    router.push('/');
+    return null; 
   }
 
   return (
@@ -429,6 +411,8 @@ const AdminFinanceiroPage: React.FC = () => {
         <title>Destreinados FC - Controle Financeiro</title>
       </Head>
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Controle Financeiro</h1>
+
+      {error && <p className="text-red-500 mb-4 p-2 bg-red-100 rounded">{error}</p>}
 
       {/* Formulário para Adicionar Novo Participante Financeiro */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
@@ -500,11 +484,11 @@ const AdminFinanceiroPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Status de Pagamento por Jogador */}
+      {/* Status de Pagamento por Participante */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status de Pagamento por Participante</h2>
-        {participantesFinanceiros.length === 0 ? (
-          <p className="text-gray-600">Nenhum participante financeiro cadastrado ainda. Use o formulário acima para adicionar.</p>
+        {!loading && participantesFinanceiros.length === 0 ? ( 
+          <p className="text-gray-600">Nenhum participante financeiro cadastrado ou encontrado para este mês. Use o formulário acima para adicionar.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full bg-white">
