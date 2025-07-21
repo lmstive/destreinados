@@ -12,11 +12,10 @@ const AdminPresencaPage: React.FC = () => {
 
     mensagem += `⚽️ Jogo de Quarta-feira (22:00h - Arena Biasi)\n\n`;
     mensagem += `*Goleiros:*\n`;
-    // 2 slots para goleiros titulares, 1 para reserva
+    // 2 slots para goleiros titulares
     for (let i = 0; i < 2; i++) {
         mensagem += `${String(i + 1).padStart(2, '0')} - \n`;
     }
-    mensagem += `02 - \n`; // Slot extra para goleiro reserva
     mensagem += `\n`;
 
     mensagem += `*Jogadores de Linha:*\n`;
