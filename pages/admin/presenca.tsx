@@ -16,7 +16,7 @@ const AdminPresencaPage: React.FC = () => {
     for (let i = 0; i < 2; i++) {
         mensagem += `${String(i + 1).padStart(2, '0')} - \n`;
     }
-    mensagem += `03 - \n`; // Slot extra para goleiro reserva
+    mensagem += `02 - \n`; // Slot extra para goleiro reserva
     mensagem += `\n`;
 
     mensagem += `*Jogadores de Linha:*\n`;
