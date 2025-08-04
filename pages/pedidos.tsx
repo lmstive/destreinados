@@ -140,7 +140,7 @@ Após análise do pleito, decido:
 ( ) APROVADO COM RESSALVAS. O prazo foi reduzido para [ESCREVER_TEMPO] e a compensação será [ESCREVER_NOVA_CONDICAO].
 ( ) REPROVADO. O sofá já foi devidamente preparado para recebê-lo. O não cumprimento do horário original acarretará em sanções previstas no Artigo 7 do nosso relacionamento ("Dormir com o cachorro").`,
     campos: [
-      { id: 'nome_solicitante_aditivo', label: 'Seu Nome Completo e Desesperado:', placeholder: 'Fulano de Tal', type: 'text', default: '' },
+      { id: 'nome_solicitante_aditivo', label: 'Seu Nome:', placeholder: 'Fulano de Tal', type: 'text', default: '' },
       { id: 'horas_extras', label: 'Extensão Solicitada (ex: 1 hora):', placeholder: '1 hora', type: 'text', default: '1 hora' },
     ],
     opcoes: [
