@@ -107,7 +107,7 @@ Resposta da Chefia (Marque com um X ou mande um áudio engraçado):
   {
     id: 'aditivo-resenha',
     titulo: 'Aditivo Contratual para a Resenha Pós-Jogo',
-    textoBase: `ADITIVO CONTRATUAL Nº ${new Date().getFullYear()}-${Math.floor(Math.random() * 100)} AO ALVARÁ DE LIBERAÇÃO ESPORTIVA
+    textoBase: `ADITIVO CONTRATUAL [TITULO_DINAMICO] AO ALVARÁ DE LIBERAÇÃO ESPORTIVA
 ASSUNTO: Extensão de Prazo para Atividade de Análise Tática e Terapêutica Pós-Jogo (Resenha)
 DE: [NOME_SOLICITANTE_ADITIVO]
 PARA: A Magnífica Reitora do Lar, Chefa Suprema do Controle Remoto e Gestora da Paz Conjugal.
@@ -227,6 +227,16 @@ const PedidosPage: React.FC = () => {
       final = final.replace(new RegExp(escapeRegExp('[HORARIO_FINAL_MAIS_30MIN_CHURRASCO]'), 'g'), horarioFinal ? addMinutesToTime(horarioFinal, 30) : 'HH:MM');
     }
     if (currentTemplate.id === 'aditivo-resenha') {
+        const hoje = new Date();
+        const dia = String(hoje.getDate()).padStart(2, '0');
+        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+        const ano = hoje.getFullYear();
+        const dataFormatada = `${dia}/${mes}/${ano}`;
+        
+        const numeroDoProcesso = `${dia}${mes}`;
+        const tituloDinamico = `Nº ${ano}-${numeroDoProcesso} (EMITIDO EM ${dataFormatada})`;
+        final = final.replace(new RegExp(escapeRegExp('[TITULO_DINAMICO]'), 'g'), tituloDinamico);
+
         const compensacaoEscolhida = currentTemplate.opcoes?.find(g => g.id === 'compensacao')?.opcoes.find(o => formValues[o.id])?.texto || '';
         final = final.replace(new RegExp(escapeRegExp('[ESCREVER_COMPENSACAO]'), 'g'), compensacaoEscolhida);
         final = final.replace(new RegExp(escapeRegExp('[ESCREVER_TEMPO]'), 'g'), formValues.horas_extras as string || '');
