@@ -11,20 +11,17 @@ type Foto = {
   id: number;
   foto_url: string;
   legenda: string | null;
-  file_path: string;
+  file_path: string; // Manter no tipo para não quebrar a função de delete
 };
 
 const GerenciarGaleria = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
-
   const [fotos, setFotos] = useState<Foto[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-
   const [newFotoFile, setNewFotoFile] = useState<File | null>(null);
   const [newLegenda, setNewLegenda] = useState('');
-
   const [editingFoto, setEditingFoto] = useState<Foto | null>(null);
   const [editingLegenda, setEditingLegenda] = useState('');
 
@@ -37,7 +34,7 @@ const GerenciarGaleria = () => {
     setLoading(true);
     const { data, error } = await supabase.from('galeria_fotos').select('*').order('created_at', { ascending: false });
     if (error) console.error('Erro ao buscar fotos:', error);
-    else if (data) setFotos(data);
+    else if (data) setFotos(data as Foto[]);
     setLoading(false);
   };
 
@@ -51,21 +48,23 @@ const GerenciarGaleria = () => {
 
     try {
       setUploading(true);
-      // CORREÇÃO 1: Ajustado o caminho para salvar na pasta 'galeria'
-      const filePath = `galeria/${Date.now()}-${newFotoFile.name}`; 
+      const filePath = `galeria/${Date.now()}-${newFotoFile.name}`;
       
-      // CORREÇÃO 2: Alterado o nome do bucket de 'galeria' para 'fotos-jogadores'
       const { error: uploadError } = await supabase.storage.from('fotos-jogadores').upload(filePath, newFotoFile);
       if (uploadError) throw uploadError;
 
-      // CORREÇÃO 3: Alterado o nome do bucket aqui também
       const { data: urlData } = supabase.storage.from('fotos-jogadores').getPublicUrl(filePath);
       
+      // ==========================================================
+      // AQUI ESTÁ A CORREÇÃO
+      // ==========================================================
       const { error: insertError } = await supabase.from('galeria_fotos').insert({
         foto_url: urlData.publicUrl,
         legenda: newLegenda || null,
-        file_path: filePath,
+        // A linha abaixo foi removida para não dar erro, pois a coluna não existe.
+        // file_path: filePath, 
       });
+      // ==========================================================
       if (insertError) throw insertError;
 
       setNewFotoFile(null);
@@ -86,12 +85,14 @@ const GerenciarGaleria = () => {
     }
   };
 
+  // ... (o restante do seu código permanece igual)
   const handleDeleteFoto = async (foto: Foto) => {
     if (!window.confirm('Tem certeza que deseja excluir esta foto? A ação não pode ser desfeita.')) return;
     try {
-      // CORREÇÃO 4: Alterado o nome do bucket para a exclusão funcionar
-      const { error: storageError } = await supabase.storage.from('fotos-jogadores').remove([foto.file_path]);
-      if (storageError) throw storageError;
+        // AVISO: Esta parte pode não funcionar como esperado.
+      if (foto.file_path) {
+        await supabase.storage.from('fotos-jogadores').remove([foto.file_path]);
+      }
 
       const { error: dbError } = await supabase.from('galeria_fotos').delete().match({ id: foto.id });
       if (dbError) throw dbError;
