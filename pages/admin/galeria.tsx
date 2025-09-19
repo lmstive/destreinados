@@ -51,12 +51,15 @@ const GerenciarGaleria = () => {
 
     try {
       setUploading(true);
-      const filePath = `public/${Date.now()}-${newFotoFile.name}`;
+      // CORREÇÃO 1: Ajustado o caminho para salvar na pasta 'galeria'
+      const filePath = `galeria/${Date.now()}-${newFotoFile.name}`; 
       
-      const { error: uploadError } = await supabase.storage.from('galeria').upload(filePath, newFotoFile);
+      // CORREÇÃO 2: Alterado o nome do bucket de 'galeria' para 'fotos-jogadores'
+      const { error: uploadError } = await supabase.storage.from('fotos-jogadores').upload(filePath, newFotoFile);
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from('galeria').getPublicUrl(filePath);
+      // CORREÇÃO 3: Alterado o nome do bucket aqui também
+      const { data: urlData } = supabase.storage.from('fotos-jogadores').getPublicUrl(filePath);
       
       const { error: insertError } = await supabase.from('galeria_fotos').insert({
         foto_url: urlData.publicUrl,
@@ -67,15 +70,11 @@ const GerenciarGaleria = () => {
 
       setNewFotoFile(null);
       setNewLegenda('');
-
-      // ==========================================================
-      // AQUI ESTÁ A CORREÇÃO
-      // ==========================================================
+      
       const fileInput = document.querySelector<HTMLInputElement>('#foto-input');
       if (fileInput) {
         fileInput.value = '';
       }
-      // ==========================================================
       
       await fetchFotos();
 
@@ -90,7 +89,8 @@ const GerenciarGaleria = () => {
   const handleDeleteFoto = async (foto: Foto) => {
     if (!window.confirm('Tem certeza que deseja excluir esta foto? A ação não pode ser desfeita.')) return;
     try {
-      const { error: storageError } = await supabase.storage.from('galeria').remove([foto.file_path]);
+      // CORREÇÃO 4: Alterado o nome do bucket para a exclusão funcionar
+      const { error: storageError } = await supabase.storage.from('fotos-jogadores').remove([foto.file_path]);
       if (storageError) throw storageError;
 
       const { error: dbError } = await supabase.from('galeria_fotos').delete().match({ id: foto.id });
