@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import LoginBtn from './LoginBtn';
 
+
 const Navbar: React.FC = () => {
   const { data: session } = useSession();
   const [menuAberto, setMenuAberto] = useState(false); // Estado para o menu mobile
@@ -32,6 +33,7 @@ const Navbar: React.FC = () => {
             <Link href="/jogadores" className="hover:text-gray-300">Time</Link>
             <Link href="/pedidos" className="hover:text-gray-300">Pedidos</Link>
             <Link href="/galeria" className="hover:text-gray-300">Galeria</Link>
+            <Link href="/sorteio" className="hover:text-gray-300">Sorteio</Link>
             <Link href="/contato" className="hover:text-gray-300">Contato</Link>
 
             {session && (
