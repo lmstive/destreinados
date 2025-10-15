@@ -1,5 +1,6 @@
 // pages/sorteio.tsx
 import React, { useEffect, useMemo, useState, type CSSProperties } from "react";
+import Layout from "../components/Layout"; // ajuste o caminho se seu Layout estiver em outro lugar
 
 type Team = { name: string; players: string[]; keeper?: string; subs: string[] };
 
@@ -170,7 +171,7 @@ function TeamCard({ title, team }: { title: string; team: Team }) {
   );
 }
 
-export default function SorteioPage() {
+function SorteioPage() {
   const [waRaw, setWaRaw] = useState("");
   const [teamA, setTeamA] = useState<Team | null>(null);
   const [teamB, setTeamB] = useState<Team | null>(null);
@@ -340,6 +341,14 @@ export default function SorteioPage() {
   );
 }
 
+/* ===== Layout nesta página ===== */
+// Faz esta página usar o Layout global (Navbar/Footer)
+(SorteioPage as any).getLayout = function getLayout(page: React.ReactElement) {
+  return <Layout>{page}</Layout>;
+};
+
+export default SorteioPage;
+
 /* ===== estilos ===== */
 
 const styles: Record<string, CSSProperties> = {
@@ -409,7 +418,6 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 10,
     color: "white",
     fontWeight: 600,
-    cursor: "pointer",
   },
   buttonDisabled: { opacity: 0.5, cursor: "not-allowed" },
   results: {
