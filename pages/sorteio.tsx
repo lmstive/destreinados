@@ -1,14 +1,13 @@
-// app/sorteio/page.tsx
-"use client";
-
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+// pages/sorteio.tsx
+import React, { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 type Team = { name: string; players: string[]; keeper?: string; subs: string[] };
 
 const titleDefault = "⚽️ Jogo de Quarta-feira (22:00h - Arena Biasi)";
-const STORAGE_KEY = "destreinados-sorteio-v3";
+const STORAGE_KEY = "destreinados-sorteio-v3-pages";
 
-// ---------- Utils ----------
+/* ===== Utils ===== */
+
 function stripNumberPrefix(s: string) {
   // remove "01 -", "1.", "1)", "01 –", etc
   return s.replace(/^\s*\d+\s*[-.)–—]\s*/g, "").trim();
@@ -40,20 +39,12 @@ function splitEven<T>(items: T[]): [T[], T[]] {
 // Remove acentos e mantém só letras/números/espaço/dois-pontos
 function normalizeSection(s: string) {
   const noAccents = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return noAccents
-    .toLowerCase()
-    .replace(/[^a-z0-9\s:]/g, "")
-    .trim();
+  return noAccents.toLowerCase().replace(/[^a-z0-9\s:]/g, "").trim();
 }
 
-type ParsedWA = {
-  title?: string;
-  keepers: string[];
-  field: string[];
-  subs: string[];
-};
+type ParsedWA = { title?: string; keepers: string[]; field: string[]; subs: string[] };
 
-// Parser do WhatsApp (robusto para colagem com/sem numeração)
+// Parser do WhatsApp
 function parseFromWhatsApp(raw: string): ParsedWA {
   const out: ParsedWA = { keepers: [], field: [], subs: [] };
   const lines = raw.split(/\r?\n/);
@@ -143,7 +134,8 @@ function parseFromWhatsApp(raw: string): ParsedWA {
   return out;
 }
 
-// ---------- UI ----------
+/* ===== UI ===== */
+
 function TeamCard({ title, team }: { title: string; team: Team }) {
   return (
     <div style={styles.teamCard}>
@@ -178,7 +170,7 @@ function TeamCard({ title, team }: { title: string; team: Team }) {
   );
 }
 
-export default function Sorteio() {
+export default function SorteioPage() {
   const [waRaw, setWaRaw] = useState("");
   const [teamA, setTeamA] = useState<Team | null>(null);
   const [teamB, setTeamB] = useState<Team | null>(null);
@@ -209,7 +201,11 @@ export default function Sorteio() {
     if (k.length >= 2) {
       [keeperA, keeperB] = [k[0], k[1]];
     } else if (k.length === 1) {
-      Math.random() < 0.5 ? (keeperA = k[0]) : (keeperB = k[0]);
+      if (Math.random() < 0.5) {
+        keeperA = k[0];
+      } else {
+        keeperB = k[0];
+      }
     }
 
     const [fieldA, fieldB] = splitEven(f);
@@ -256,7 +252,10 @@ export default function Sorteio() {
   async function handleReadClipboard() {
     try {
       const txt = await navigator.clipboard.readText();
-      if (!txt) return alert("A área de transferência está vazia.");
+      if (!txt) {
+        alert("A área de transferência está vazia.");
+        return;
+      }
       setWaRaw(txt);
       alert("✅ Texto lido da área de transferência!");
     } catch {
@@ -269,79 +268,79 @@ export default function Sorteio() {
 
   return (
     <div style={styles.page}>
-      {/* se o header do site for fixo, ajuste paddingTop se precisar */}
-      <div style={{ height: "100%", paddingTop: 0 }}>
-        <div style={styles.card}>
-          <h1 style={{ margin: 0 }}>Gerador de Equipes (modo WhatsApp)</h1>
-          <p style={{ marginTop: 8, opacity: 0.8 }}>
-            Cole o texto do grupo (com “Goleiros: / Jogadores de Linha: / Reservas:”) e clique em{" "}
-            <strong>Sortear</strong>.
-          </p>
+      <div style={styles.card}>
+        <h1 style={{ margin: 0 }}>Gerador de Equipes (modo WhatsApp)</h1>
+        <p style={{ marginTop: 8, opacity: 0.8 }}>
+          Cole o texto do grupo (com “Goleiros: / Jogadores de Linha: / Reservas:”) e clique em{" "}
+          <strong>Sortear</strong>.
+        </p>
 
-          <div style={styles.waBlock}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-              <h3 style={{ margin: 0 }}>Colar do WhatsApp</h3>
-              <button style={styles.buttonGhost} onClick={handleReadClipboard}>
-                Ler da área de transferência
-              </button>
-              <button style={styles.buttonGhost} onClick={handleSave}>
-                Salvar texto
-              </button>
-            </div>
-            <textarea
-              style={styles.textarea}
-              placeholder={`Exemplo:\n\n⚽ Jogo de Quarta-feira (22:00h - Arena Biasi)\n\nGoleiros:\n01 - Goleiro bruno\n02 - Diogo\n\nJogadores de Linha:\n01 - Francisco\n02 - Fernando\n...\n\nReservas:\n01 - ...\n02 - ...`}
-              value={waRaw}
-              onChange={(e) => setWaRaw(e.target.value)}
-            />
-            <small style={styles.hint}>Funciona com ou sem numeração.</small>
-
-            <div style={styles.preview}>
-              <div>
-                <strong>Título:</strong> {title}
-              </div>
-              <div style={styles.previewCols}>
-                <div>
-                  <strong>Goleiros:</strong> {parsed.keepers.join(", ") || "—"}
-                </div>
-                <div>
-                  <strong>Jogadores:</strong> {parsed.field.join(", ") || "—"}
-                </div>
-                <div>
-                  <strong>Reservas:</strong> {parsed.subs.join(", ") || "—"}
-                </div>
-              </div>
-            </div>
+        <div style={styles.waBlock}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <h3 style={{ margin: 0 }}>Colar do WhatsApp</h3>
+            <button style={styles.buttonGhost} onClick={handleReadClipboard}>
+              Ler da área de transferência
+            </button>
+            <button style={styles.buttonGhost} onClick={handleSave}>
+              Salvar texto
+            </button>
           </div>
+          <textarea
+            style={styles.textarea}
+            placeholder={`Exemplo:\n\n⚽ Jogo de Quarta-feira (22:00h - Arena Biasi)\n\nGoleiros:\n01 - Goleiro bruno\n02 - Diogo\n\nJogadores de Linha:\n01 - Francisco\n02 - Fernando\n...\n\nReservas:\n01 - ...\n02 - ...`}
+            value={waRaw}
+            onChange={(e) => setWaRaw(e.target.value)}
+          />
+          <small style={styles.hint}>Funciona com ou sem numeração.</small>
 
-          <div style={styles.actions}>
-            <button
-              style={{ ...styles.button, ...(canDraw ? {} : styles.buttonDisabled) }}
-              onClick={handleDraw}
-              disabled={!canDraw}
-            >
-              Sortear
-            </button>
-            <button
-              style={{ ...styles.button, ...(teamA && teamB ? {} : styles.buttonDisabled) }}
-              onClick={handleCopy}
-              disabled={!teamA || !teamB}
-            >
-              Copiar resultado
-            </button>
+          {/* Prévia */}
+          <div style={styles.preview}>
+            <div>
+              <strong>Título:</strong> {title}
+            </div>
+            <div style={styles.previewCols}>
+              <div>
+                <strong>Goleiros:</strong> {parsed.keepers.join(", ") || "—"}
+              </div>
+              <div>
+                <strong>Jogadores:</strong> {parsed.field.join(", ") || "—"}
+              </div>
+              <div>
+                <strong>Reservas:</strong> {parsed.subs.join(", ") || "—"}
+              </div>
+            </div>
           </div>
         </div>
 
-        {(teamA || teamB) && (
-          <div style={styles.results}>
-            {teamA && <TeamCard title={title} team={teamA} />}
-            {teamB && <TeamCard title={title} team={teamB} />}
-          </div>
-        )}
+        <div style={styles.actions}>
+          <button
+            style={{ ...styles.button, ...(canDraw ? {} : styles.buttonDisabled) }}
+            onClick={handleDraw}
+            disabled={!canDraw}
+          >
+            Sortear
+          </button>
+          <button
+            style={{ ...styles.button, ...(teamA && teamB ? {} : styles.buttonDisabled) }}
+            onClick={handleCopy}
+            disabled={!teamA || !teamB}
+          >
+            Copiar resultado
+          </button>
+        </div>
       </div>
+
+      {(teamA || teamB) && (
+        <div style={styles.results}>
+          {teamA && <TeamCard title={title} team={teamA} />}
+          {teamB && <TeamCard title={title} team={teamB} />}
+        </div>
+      )}
     </div>
   );
 }
+
+/* ===== estilos ===== */
 
 const styles: Record<string, CSSProperties> = {
   page: {
