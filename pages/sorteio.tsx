@@ -285,7 +285,7 @@ function SorteioPage() {
           </div>
           <textarea
             style={styles.textarea}
-            placeholder={`Exemplo:\n\n⚽ Jogo de Quarta-feira (22:00h - Arena Biasi)\n\nGoleiros:\n01 - Goleiro bruno\n02 - Diogo\n\nJogadores de Linha:\n01 - Francisco\n02 - Fernando\n...\n\nReservas:\n01 - ...\n02 - ...`}
+            placeholder={`Exemplo:\n\n⚽ Jogo de Quarta-feira (22:00h - Arena Biasi)\n\nGoleiros:\n01 - Goleiro 01\n02 - Goleiro 02\n\nJogadores de Linha:\n01 - Luis Miguel\n02 - Francisco\n...\n\nReservas:\n01 - ...\n02 - ...`}
             value={waRaw}
             onChange={(e) => setWaRaw(e.target.value)}
           />
