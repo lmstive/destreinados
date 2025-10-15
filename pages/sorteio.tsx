@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 type Team = { name: string; players: string[]; keeper?: string; subs: string[] };
 
 const titleDefault = "⚽️ Jogo de Quarta-feira (22:00h - Arena Biasi)";
-const STORAGE_KEY = "destreinados-sorteio-v2";
+const STORAGE_KEY = "destreinados-sorteio-v3";
 
 /** Utilidades ********************************************/
 
@@ -36,14 +36,7 @@ function splitEven<T>(items: T[]): [T[], T[]] {
   return [items.slice(0, half), items.slice(half)];
 }
 
-function formatNumbered(list: string[]) {
-  return list
-    .map((name, i) => `${String(i + 1).padStart(2, "0")} - ${name}`)
-    .join("\n");
-}
-
 function normalizeSection(s: string) {
-  // normaliza para detectar títulos ("goleiros:", "jogadores de linha:", "reservas:")
   const n = s
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
@@ -61,8 +54,7 @@ type ParsedWA = {
 };
 
 /**
- * Parser de texto colado do WhatsApp
- * Aceita formatos com/sem numeração e com títulos “Goleiros:”, “Jogadores de Linha:”, “Reservas:”
+ * Parser do WhatsApp
  */
 function parseFromWhatsApp(raw: string): ParsedWA {
   const out: ParsedWA = { keepers: [], field: [], subs: [] };
@@ -78,8 +70,6 @@ function parseFromWhatsApp(raw: string): ParsedWA {
       break;
     }
   }
-
-  // se não achou, usa a primeira linha não-vazia e não-seção
   if (!out.title) {
     for (const l of lines) {
       const t = l.trim();
@@ -106,7 +96,6 @@ function parseFromWhatsApp(raw: string): ParsedWA {
 
     const n = normalizeSection(line);
 
-    // detecta mudança de seção
     if (n.startsWith("goleiro")) {
       current = "keepers";
       continue;
@@ -120,28 +109,21 @@ function parseFromWhatsApp(raw: string): ParsedWA {
       continue;
     }
 
-    // ignora a linha do título se cair aqui
     if (out.title && line === out.title) continue;
 
-    // adiciona nomes à seção atual, se existir
     if (current) {
       const name = stripNumberPrefix(line);
-      // evita linhas do tipo "Goleiros:" que passaram batido
       if (name && !/:$/.test(name)) {
         (out[current] as string[]).push(name);
       }
     }
   }
 
-  // fallback: se nenhuma seção encontrada, tenta inferir pelo bloco inteiro
   if (!out.keepers.length && !out.field.length && !out.subs.length) {
-    // tenta separar por blocos "Goleiros", "Jogadores", "Reservas"
-    // ou, se não tiver títulos, joga tudo como field
     const names = parseList(raw);
     out.field = names;
   }
 
-  // limpa duplicatas e espaços extras
   const uniq = (arr: string[]) => {
     const seen = new Set<string>();
     const clean: string[] = [];
@@ -166,49 +148,28 @@ function parseFromWhatsApp(raw: string): ParsedWA {
 /** Componente ********************************************/
 
 export default function Sorteio() {
-  const [title, setTitle] = useState(titleDefault);
-  const [keepersRaw, setKeepersRaw] = useState("01 - \n02 - ");
-  const [fieldRaw, setFieldRaw] = useState(
-    Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0") + " - ").join("\n")
-  );
-  const [subsRaw, setSubsRaw] = useState(
-    Array.from({ length: 4 }, (_, i) => String(i + 1).padStart(2, "0") + " - ").join("\n")
-  );
-
-  // bloco de colagem do WhatsApp
+  // Agora só existe o modo "WhatsApp"
   const [waRaw, setWaRaw] = useState("");
-
   const [teamA, setTeamA] = useState<Team | null>(null);
   const [teamB, setTeamB] = useState<Team | null>(null);
 
-  // carregar estado salvo
+  // carregar estado salvo (somente texto do WA)
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const o = JSON.parse(saved);
-        setTitle(o.title ?? titleDefault);
-        setKeepersRaw(o.keepersRaw ?? keepersRaw);
-        setFieldRaw(o.fieldRaw ?? fieldRaw);
-        setSubsRaw(o.subsRaw ?? subsRaw);
+        setWaRaw(o.waRaw ?? "");
       }
     } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const parsed = useMemo(() => {
-    const keepers = parseList(keepersRaw);
-    const field = parseList(fieldRaw);
-    const subs = parseList(subsRaw);
-    return { keepers, field, subs };
-  }, [keepersRaw, fieldRaw, subsRaw]);
+  const parsed = useMemo(() => parseFromWhatsApp(waRaw), [waRaw]);
+  const title = parsed.title || titleDefault;
 
   function handleSave() {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ title, keepersRaw, fieldRaw, subsRaw })
-    );
-    alert("✔️ Dados salvos no navegador.");
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ waRaw }));
+    alert("✔️ Texto salvo no navegador.");
   }
 
   function handleDraw() {
@@ -216,7 +177,6 @@ export default function Sorteio() {
     const f = shuffle(parsed.field);
     const s = shuffle(parsed.subs);
 
-    // Goleiros: um pra cada lado (se existirem)
     let keeperA: string | undefined;
     let keeperB: string | undefined;
     if (k.length >= 2) {
@@ -276,15 +236,6 @@ export default function Sorteio() {
     }
   }
 
-  function handleParseWA() {
-    const p = parseFromWhatsApp(waRaw);
-    setTitle(p.title || titleDefault);
-    setKeepersRaw(formatNumbered(p.keepers));
-    setFieldRaw(formatNumbered(p.field));
-    setSubsRaw(formatNumbered(p.subs));
-    alert("✅ Texto do WhatsApp interpretado e campos preenchidos!");
-  }
-
   async function handleReadClipboard() {
     try {
       const txt = await navigator.clipboard.readText();
@@ -293,14 +244,9 @@ export default function Sorteio() {
         return;
       }
       setWaRaw(txt);
-      const p = parseFromWhatsApp(txt);
-      setTitle(p.title || titleDefault);
-      setKeepersRaw(formatNumbered(p.keepers));
-      setFieldRaw(formatNumbered(p.field));
-      setSubsRaw(formatNumbered(p.subs));
-      alert("✅ Lido da área de transferência e preenchido!");
+      alert("✅ Texto lido da área de transferência!");
     } catch {
-      alert("Não consegui ler a área de transferência. Cole o texto manualmente no campo abaixo.");
+      alert("Não consegui ler a área de transferência. Cole o texto manualmente.");
     }
   }
 
@@ -310,10 +256,10 @@ export default function Sorteio() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={{ margin: 0 }}>Gerador de Equipes</h1>
+        <h1 style={{ margin: 0 }}>Gerador de Equipes (modo WhatsApp)</h1>
         <p style={{ marginTop: 8, opacity: 0.8 }}>
-          Agora você pode <strong>colar o texto do WhatsApp</strong> abaixo e eu separo tudo.
-          Depois é só clicar em <strong>Sortear</strong>. Os goleiros são distribuídos um para cada lado automaticamente.
+          Cole o texto do grupo (com “Goleiros: / Jogadores de Linha: / Reservas:”) e clique em{" "}
+          <strong>Sortear</strong>. Eu separo tudo automaticamente.
         </p>
 
         {/* BLOCO: COLAR DO WHATSAPP */}
@@ -323,69 +269,32 @@ export default function Sorteio() {
             <button style={styles.buttonGhost} onClick={handleReadClipboard}>
               Ler da área de transferência
             </button>
-            <button
-              style={{ ...styles.buttonGhost, opacity: waRaw.trim() ? 1 : 0.5 }}
-              onClick={handleParseWA}
-              disabled={!waRaw.trim()}
-            >
-              Interpretar e preencher
+            <button style={styles.buttonGhost} onClick={handleSave}>
+              Salvar texto
             </button>
           </div>
           <textarea
             style={styles.textarea}
-            placeholder={`Cole aqui algo como:\n\n⚽ Jogo de Quarta-feira (22:00h - Arena Biasi)\n\nGoleiros:\n01 - Goleiro bruno\n02 - Diogo\n\nJogadores de Linha:\n01 - Francisco\n02 - Fernando\n...\n\nReservas:\n01 - ...\n02 - ...`}
+            placeholder={`Exemplo:\n\n⚽ Jogo de Quarta-feira (22:00h - Arena Biasi)\n\nGoleiros:\n01 - Goleiro bruno\n02 - Diogo\n\nJogadores de Linha:\n01 - Francisco\n02 - Fernando\n...\n\nReservas:\n01 - ...\n02 - ...`}
             value={waRaw}
             onChange={(e) => setWaRaw(e.target.value)}
           />
           <small style={styles.hint}>
             Dica: funciona com ou sem numeração. Eu detecto “Goleiros:”, “Jogadores de Linha:” e “Reservas:”.
           </small>
-        </div>
 
-        <label style={styles.label}>Título do jogo</label>
-        <input
-          style={styles.input}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-
-        <div style={styles.grid}>
-          <div>
-            <h3 style={styles.h3}>Goleiros</h3>
-            <textarea
-              style={styles.textarea}
-              value={keepersRaw}
-              onChange={(e) => setKeepersRaw(e.target.value)}
-              placeholder={"01 - João\n02 - Pedro"}
-            />
-            <small style={styles.hint}>
-              Dica: pode colar linhas tipo “01 - Fulano” ou só “Fulano”.
-            </small>
-          </div>
-
-          <div>
-            <h3 style={styles.h3}>Jogadores de Linha</h3>
-            <textarea
-              style={styles.textarea}
-              value={fieldRaw}
-              onChange={(e) => setFieldRaw(e.target.value)}
-              placeholder={"01 - Fulano\n02 - Sicrano\n..."}
-            />
-          </div>
-
-          <div>
-            <h3 style={styles.h3}>Reservas</h3>
-            <textarea
-              style={styles.textarea}
-              value={subsRaw}
-              onChange={(e) => setSubsRaw(e.target.value)}
-              placeholder={"01 - ...\n02 - ..."}
-            />
+          {/* Prévia rápida do parsing */}
+          <div style={styles.preview}>
+            <div><strong>Título:</strong> {title}</div>
+            <div style={styles.previewCols}>
+              <div><strong>Goleiros:</strong> {parsed.keepers.join(", ") || "—"}</div>
+              <div><strong>Jogadores:</strong> {parsed.field.join(", ") || "—"}</div>
+              <div><strong>Reservas:</strong> {parsed.subs.join(", ") || "—"}</div>
+            </div>
           </div>
         </div>
 
         <div style={styles.actions}>
-          <button style={styles.button} onClick={handleSave}>Salvar</button>
           <button
             style={{ ...styles.button, ...(canDraw ? {} : styles.buttonDisabled) }}
             onClick={handleDraw}
@@ -479,6 +388,18 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     padding: 12,
     background: "#0b1220",
+  },
+  preview: {
+    marginTop: 12,
+    fontSize: 14,
+    opacity: 0.95,
+    display: "grid",
+    gap: 6,
+  },
+  previewCols: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: 6,
   },
   label: { display: "block", marginTop: 8, marginBottom: 6, fontWeight: 600 },
   input: {
