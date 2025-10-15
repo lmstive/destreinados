@@ -4,17 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 type Team = { name: string; players: string[]; keeper?: string; subs: string[] };
 
 const titleDefault = "⚽️ Jogo de Quarta-feira (22:00h - Arena Biasi)";
-const STORAGE_KEY = "destreinados-sorteio-v1";
+const STORAGE_KEY = "destreinados-sorteio-v2";
+
+/** Utilidades ********************************************/
+
+function stripNumberPrefix(s: string) {
+  // remove "01 -", "1.", "1)", "01 –", etc
+  return s.replace(/^\s*\d+\s*[-.)–—]\s*/g, "").trim();
+}
 
 function parseList(raw: string): string[] {
   return raw
     .split(/\r?\n/)
-    .map((l) =>
-      l
-        // remove "01 -", "1.", "1)" etc
-        .replace(/^\s*\d+\s*[-.)]\s*/g, "")
-        .trim()
-    )
+    .map((l) => stripNumberPrefix(l).trim())
     .filter(Boolean);
 }
 
@@ -22,7 +24,6 @@ function parseList(raw: string): string[] {
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    // número aleatório seguro
     const rand = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
     const j = Math.floor(rand * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
@@ -35,6 +36,135 @@ function splitEven<T>(items: T[]): [T[], T[]] {
   return [items.slice(0, half), items.slice(half)];
 }
 
+function formatNumbered(list: string[]) {
+  return list
+    .map((name, i) => `${String(i + 1).padStart(2, "0")} - ${name}`)
+    .join("\n");
+}
+
+function normalizeSection(s: string) {
+  // normaliza para detectar títulos ("goleiros:", "jogadores de linha:", "reservas:")
+  const n = s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s:]/gu, "")
+    .trim();
+  return n;
+}
+
+type ParsedWA = {
+  title?: string;
+  keepers: string[];
+  field: string[];
+  subs: string[];
+};
+
+/**
+ * Parser de texto colado do WhatsApp
+ * Aceita formatos com/sem numeração e com títulos “Goleiros:”, “Jogadores de Linha:”, “Reservas:”
+ */
+function parseFromWhatsApp(raw: string): ParsedWA {
+  const out: ParsedWA = { keepers: [], field: [], subs: [] };
+  const lines = raw.split(/\r?\n/);
+
+  // tenta achar título: prioriza linha com "⚽" ou "jogo"
+  for (const l of lines) {
+    const t = l.trim();
+    if (!t) continue;
+    const norm = normalizeSection(t);
+    if (t.includes("⚽") || norm.includes("jogo")) {
+      out.title = t;
+      break;
+    }
+  }
+
+  // se não achou, usa a primeira linha não-vazia e não-seção
+  if (!out.title) {
+    for (const l of lines) {
+      const t = l.trim();
+      if (!t) continue;
+      const n = normalizeSection(t);
+      const isSection =
+        n.startsWith("goleiro") ||
+        n.startsWith("jogadores de linha") ||
+        n.startsWith("jogadores") ||
+        n.startsWith("reservas") ||
+        n.endsWith(":");
+      if (!isSection) {
+        out.title = t;
+        break;
+      }
+    }
+  }
+
+  let current: "keepers" | "field" | "subs" | null = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const n = normalizeSection(line);
+
+    // detecta mudança de seção
+    if (n.startsWith("goleiro")) {
+      current = "keepers";
+      continue;
+    }
+    if (n.startsWith("jogadores de linha") || n.startsWith("jogadores")) {
+      current = "field";
+      continue;
+    }
+    if (n.startsWith("reserva")) {
+      current = "subs";
+      continue;
+    }
+
+    // ignora a linha do título se cair aqui
+    if (out.title && line === out.title) continue;
+
+    // adiciona nomes à seção atual, se existir
+    if (current) {
+      const name = stripNumberPrefix(line);
+      // evita linhas do tipo "Goleiros:" que passaram batido
+      if (name && !/:$/.test(name)) {
+        (out[current] as string[]).push(name);
+      }
+    }
+  }
+
+  // fallback: se nenhuma seção encontrada, tenta inferir pelo bloco inteiro
+  if (!out.keepers.length && !out.field.length && !out.subs.length) {
+    // tenta separar por blocos "Goleiros", "Jogadores", "Reservas"
+    // ou, se não tiver títulos, joga tudo como field
+    const names = parseList(raw);
+    out.field = names;
+  }
+
+  // limpa duplicatas e espaços extras
+  const uniq = (arr: string[]) => {
+    const seen = new Set<string>();
+    const clean: string[] = [];
+    for (const x of arr) {
+      const y = x.replace(/\s{2,}/g, " ").trim();
+      const k = y.toLowerCase();
+      if (!y) continue;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      clean.push(y);
+    }
+    return clean;
+  };
+
+  out.keepers = uniq(out.keepers);
+  out.field = uniq(out.field);
+  out.subs = uniq(out.subs);
+
+  return out;
+}
+
+/** Componente ********************************************/
+
 export default function Sorteio() {
   const [title, setTitle] = useState(titleDefault);
   const [keepersRaw, setKeepersRaw] = useState("01 - \n02 - ");
@@ -44,6 +174,9 @@ export default function Sorteio() {
   const [subsRaw, setSubsRaw] = useState(
     Array.from({ length: 4 }, (_, i) => String(i + 1).padStart(2, "0") + " - ").join("\n")
   );
+
+  // bloco de colagem do WhatsApp
+  const [waRaw, setWaRaw] = useState("");
 
   const [teamA, setTeamA] = useState<Team | null>(null);
   const [teamB, setTeamB] = useState<Team | null>(null);
@@ -89,7 +222,6 @@ export default function Sorteio() {
     if (k.length >= 2) {
       [keeperA, keeperB] = [k[0], k[1]];
     } else if (k.length === 1) {
-      // sorteia pra qual lado vai
       const goesA = Math.random() < 0.5;
       keeperA = goesA ? k[0] : undefined;
       keeperB = goesA ? undefined : k[0];
@@ -134,7 +266,6 @@ export default function Sorteio() {
       await navigator.clipboard.writeText(txt);
       alert("📋 Copiado para a área de transferência!");
     } catch {
-      // fallback
       const ta = document.createElement("textarea");
       ta.value = txt;
       document.body.appendChild(ta);
@@ -142,6 +273,34 @@ export default function Sorteio() {
       document.execCommand("copy");
       document.body.removeChild(ta);
       alert("📋 Copiado!");
+    }
+  }
+
+  function handleParseWA() {
+    const p = parseFromWhatsApp(waRaw);
+    setTitle(p.title || titleDefault);
+    setKeepersRaw(formatNumbered(p.keepers));
+    setFieldRaw(formatNumbered(p.field));
+    setSubsRaw(formatNumbered(p.subs));
+    alert("✅ Texto do WhatsApp interpretado e campos preenchidos!");
+  }
+
+  async function handleReadClipboard() {
+    try {
+      const txt = await navigator.clipboard.readText();
+      if (!txt) {
+        alert("A área de transferência está vazia.");
+        return;
+      }
+      setWaRaw(txt);
+      const p = parseFromWhatsApp(txt);
+      setTitle(p.title || titleDefault);
+      setKeepersRaw(formatNumbered(p.keepers));
+      setFieldRaw(formatNumbered(p.field));
+      setSubsRaw(formatNumbered(p.subs));
+      alert("✅ Lido da área de transferência e preenchido!");
+    } catch {
+      alert("Não consegui ler a área de transferência. Cole o texto manualmente no campo abaixo.");
     }
   }
 
@@ -153,9 +312,35 @@ export default function Sorteio() {
       <div style={styles.card}>
         <h1 style={{ margin: 0 }}>Gerador de Equipes</h1>
         <p style={{ marginTop: 8, opacity: 0.8 }}>
-          Monte os nomes e clique em <strong>Sortear</strong>. Os goleiros são
-          distribuídos um para cada lado automaticamente.
+          Agora você pode <strong>colar o texto do WhatsApp</strong> abaixo e eu separo tudo.
+          Depois é só clicar em <strong>Sortear</strong>. Os goleiros são distribuídos um para cada lado automaticamente.
         </p>
+
+        {/* BLOCO: COLAR DO WHATSAPP */}
+        <div style={styles.waBlock}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <h3 style={{ margin: 0 }}>Colar do WhatsApp</h3>
+            <button style={styles.buttonGhost} onClick={handleReadClipboard}>
+              Ler da área de transferência
+            </button>
+            <button
+              style={{ ...styles.buttonGhost, opacity: waRaw.trim() ? 1 : 0.5 }}
+              onClick={handleParseWA}
+              disabled={!waRaw.trim()}
+            >
+              Interpretar e preencher
+            </button>
+          </div>
+          <textarea
+            style={styles.textarea}
+            placeholder={`Cole aqui algo como:\n\n⚽ Jogo de Quarta-feira (22:00h - Arena Biasi)\n\nGoleiros:\n01 - Goleiro bruno\n02 - Diogo\n\nJogadores de Linha:\n01 - Francisco\n02 - Fernando\n...\n\nReservas:\n01 - ...\n02 - ...`}
+            value={waRaw}
+            onChange={(e) => setWaRaw(e.target.value)}
+          />
+          <small style={styles.hint}>
+            Dica: funciona com ou sem numeração. Eu detecto “Goleiros:”, “Jogadores de Linha:” e “Reservas:”.
+          </small>
+        </div>
 
         <label style={styles.label}>Título do jogo</label>
         <input
@@ -267,6 +452,8 @@ function TeamCard({ title, team }: { title: string; team: Team }) {
   );
 }
 
+/** Estilos inline ********************************************/
+
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
@@ -284,6 +471,14 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 16,
     padding: 20,
     boxShadow: "0 10px 25px rgba(0,0,0,.25)",
+  },
+  waBlock: {
+    marginTop: 14,
+    marginBottom: 14,
+    border: "1px dashed #374151",
+    borderRadius: 12,
+    padding: 12,
+    background: "#0b1220",
   },
   label: { display: "block", marginTop: 8, marginBottom: 6, fontWeight: 600 },
   input: {
@@ -322,6 +517,15 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     color: "white",
     fontWeight: 700,
+    cursor: "pointer",
+  },
+  buttonGhost: {
+    padding: "8px 12px",
+    background: "transparent",
+    border: "1px solid #374151",
+    borderRadius: 10,
+    color: "white",
+    fontWeight: 600,
     cursor: "pointer",
   },
   buttonDisabled: { opacity: 0.5, cursor: "not-allowed" },
